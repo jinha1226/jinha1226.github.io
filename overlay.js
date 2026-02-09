@@ -252,9 +252,9 @@
     +'touch-action:manipulation;-webkit-user-select:none;user-select:none;}'
     +'#sp-rows{display:flex;flex-direction:column;gap:3px;}'
     +'.sp-row{display:flex;gap:3px;justify-content:center;padding:0 2px;}'
-    +'.sp-k{display:inline-flex;align-items:center;justify-content:center;height:44px;min-width:0;'
+    +'.sp-k{display:inline-flex;align-items:center;justify-content:center;height:52px;min-width:0;'
     +'flex:1;padding:0 2px;background:#4a4a4a;border:1px solid #666;border-radius:6px;color:#eee;'
-    +'font-size:15px;font-weight:500;cursor:pointer;touch-action:manipulation;'
+    +'font-size:18px;font-weight:500;cursor:pointer;touch-action:manipulation;'
     +'-webkit-tap-highlight-color:transparent;transition:background .08s;}'
     +'.sp-k:active,.sp-k.pressed{background:#6a9fff;border-color:#88b4ff;color:#fff;}'
     +'.sp-k.mod{background:#3a3a3a;}'
@@ -313,7 +313,7 @@
     +'color:#0f0;padding:4px 8px;border-radius:4px;font-size:11px;font-family:monospace;'
     +'pointer-events:none;opacity:0;transition:opacity .3s;}'
     +'#sp-status.show{opacity:1;}'
-    +'@media(orientation:landscape){.sp-k{height:38px;font-size:13px;}'
+    +'@media(orientation:landscape){.sp-k{height:44px;font-size:15px;}'
     +'#sp-overlay{padding:2px 3px env(safe-area-inset-bottom,2px);}'
     +'.sp-dp{width:56px;height:56px;font-size:18px;}'
     +'.sp-act{width:50px;height:44px;font-size:12px;}}';
@@ -442,27 +442,11 @@
     }
   });
 
-  // ── Zoom Functions ──
+  // ── Zoom Functions (CSS zoom — proper layout reflow + scrollable) ──
   function applyZoom() {
-    document.body.style.transformOrigin = 'top left';
-    document.body.style.transform = 'scale(' + (zoomLevel / 100) + ')';
-    document.body.style.width = (10000 / zoomLevel) + '%';
+    // CSS zoom adjusts layout properly — scrolling works, no clipping
+    document.documentElement.style.zoom = (zoomLevel / 100);
     zoomLabel.textContent = zoomLevel + '%';
-    // Keep our UI elements at original scale
-    var invScale = 100 / zoomLevel;
-    btnBar.style.transform = 'scale(' + invScale + ')';
-    btnBar.style.transformOrigin = 'bottom right';
-    status.style.transform = 'scale(' + invScale + ')';
-    status.style.transformOrigin = 'top right';
-    indicator.style.transform = 'scale(' + invScale + ')';
-    if (dpadPanel.style.display !== 'none') {
-      dpadPanel.style.transform = 'scale(' + invScale + ')';
-      actPanel.style.transform = 'scale(' + invScale + ')';
-    }
-    if (kb.style.display !== 'none') {
-      kb.style.transform = 'scale(' + invScale + ')';
-      kb.style.transformOrigin = 'bottom left';
-    }
   }
 
   zoomInBtn.addEventListener('click', function(e) {
@@ -484,16 +468,8 @@
   zoomResetBtn.addEventListener('click', function(e) {
     e.stopPropagation();
     zoomLevel = 100;
-    document.body.style.transform = '';
-    document.body.style.width = '';
-    document.body.style.transformOrigin = '';
+    document.documentElement.style.zoom = '';
     zoomLabel.textContent = '100%';
-    btnBar.style.transform = '';
-    status.style.transform = '';
-    indicator.style.transform = '';
-    dpadPanel.style.transform = '';
-    actPanel.style.transform = '';
-    kb.style.transform = '';
     showStatus('Zoom: Reset', '#5af');
   });
 
@@ -864,18 +840,9 @@
     dpadVisible = !dpadVisible;
     dpadPanel.style.display = dpadVisible ? '' : 'none';
     actPanel.style.display = dpadVisible ? '' : 'none';
-    if (dpadVisible) {
-      gamepadToggle.setAttribute('style', BTN_ROUND + 'background:rgba(220,50,50,.9) !important;border-color:#f66 !important;');
-      if (zoomLevel !== 100) {
-        var invScale = 100 / zoomLevel;
-        dpadPanel.style.transform = 'scale(' + invScale + ')';
-        dpadPanel.style.transformOrigin = 'bottom left';
-        actPanel.style.transform = 'scale(' + invScale + ')';
-        actPanel.style.transformOrigin = 'bottom right';
-      }
-    } else {
-      gamepadToggle.setAttribute('style', BTN_ROUND);
-    }
+    gamepadToggle.setAttribute('style', dpadVisible
+      ? BTN_ROUND + 'background:rgba(220,50,50,.9) !important;border-color:#f66 !important;'
+      : BTN_ROUND);
   });
 
   // ── Toggle: Full Keyboard ──
@@ -887,11 +854,6 @@
     if (kbVisible) {
       kbToggle.setAttribute('style', BTN_ROUND + 'background:rgba(220,50,50,.9) !important;border-color:#f66 !important;');
       btnBar.style.bottom = (kb.offsetHeight + 10) + 'px';
-      if (zoomLevel !== 100) {
-        var invScale = 100 / zoomLevel;
-        kb.style.transform = 'scale(' + invScale + ')';
-        kb.style.transformOrigin = 'bottom left';
-      }
     } else {
       kbToggle.setAttribute('style', BTN_ROUND);
       btnBar.style.bottom = '10px';
