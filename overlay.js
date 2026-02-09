@@ -17,6 +17,9 @@
     27:-205, 46:-206, 32:-207
   };
 
+  // ── Send Mode: 'ws' or 'dom' (toggled manually) ──
+  var sendMode = 'ws'; // default to WS mode
+
   // ── Find WebSocket ──
   var gameSocket = null;
 
@@ -32,7 +35,6 @@
   // Strategy 2: Search existing WebSocket instances
   function findExistingSocket() {
     if (gameSocket && gameSocket.readyState === WebSocket.OPEN) return;
-    // Check common global patterns
     var candidates = ['socket', 'ws', '_socket', 'websocket', 'conn'];
     for (var i = 0; i < candidates.length; i++) {
       try {
@@ -43,7 +45,6 @@
         }
       } catch(e) {}
     }
-    // Try RequireJS comm module
     if (typeof require === 'function') {
       try {
         require(['comm'], function(comm) {
@@ -54,14 +55,16 @@
   }
   findExistingSocket();
 
+  function useWS() {
+    return sendMode === 'ws' && gameSocket && gameSocket.readyState === WebSocket.OPEN;
+  }
+
   // ── Send Key to DCSS ──
   function sendToCrawl(keyDef) {
     var ek = effectiveKey(keyDef);
     var kc = parseInt(keyDef.kc, 10);
 
-    // Try WebSocket direct message first
-    if (gameSocket && gameSocket.readyState === WebSocket.OPEN) {
-      // Ctrl+key: send control character code
+    if (useWS()) {
       if (ctrl && !shift && ek.length === 1) {
         var ch = ek.toUpperCase().charCodeAt(0);
         if (ch >= 65 && ch <= 90) {
@@ -69,10 +72,7 @@
           return;
         }
       }
-
-      // Special keys with modifiers
       if (ctrl && shift && kc in CRAWL_CTRL) {
-        // ctrlshift not fully needed, just send ctrl version
         wsSend('{"msg":"key","keycode":' + CRAWL_CTRL[kc] + '}');
         return;
       }
@@ -84,30 +84,52 @@
         wsSend('{"msg":"key","keycode":' + CRAWL_SHIFT[kc] + '}');
         return;
       }
-
-      // Simple special keys (arrows, escape, backspace, etc.)
       if (kc in CRAWL_SIMPLE) {
         wsSend('{"msg":"key","keycode":' + CRAWL_SIMPLE[kc] + '}');
         return;
       }
-
-      // Regular character input
       if (ek.length === 1) {
         wsSend('{"msg":"input","text":' + JSON.stringify(ek) + '}');
         return;
       }
-
-      // Enter as keycode
       if (ek === 'Enter') {
         wsSend('{"msg":"key","keycode":13}');
         return;
       }
     }
 
-    // Fallback: DOM event dispatch
+    // DOM mode (or WS fallback)
     dispatchDOMEvents('keydown', keyDef);
     if (ek.length === 1) {
       dispatchDOMEvents('keypress', keyDef);
+    }
+  }
+
+  // Send a simple character (for D-pad/action buttons)
+  function sendChar(ch) {
+    if (useWS()) {
+      wsSend('{"msg":"input","text":' + JSON.stringify(ch) + '}');
+      showStatus('WS: ' + ch, '#0f0');
+    } else {
+      // DOM mode: build a fake keyDef for the character
+      var fakeKey = { key: ch, code: '', kc: ch.charCodeAt(0) };
+      dispatchDOMEvents('keydown', fakeKey);
+      dispatchDOMEvents('keypress', fakeKey);
+      showStatus('DOM: ' + ch, '#f90');
+    }
+  }
+
+  // Send a keycode (for special keys like Tab, Escape)
+  function sendKeycode(code) {
+    if (useWS()) {
+      wsSend('{"msg":"key","keycode":' + code + '}');
+      showStatus('WS: kc=' + code, '#0f0');
+    } else {
+      // DOM mode: dispatch keydown with the keycode
+      var keyMap = {9:'Tab',27:'Escape',13:'Enter',8:'Backspace'};
+      var fakeKey = { key: keyMap[code] || '', code: '', kc: code };
+      dispatchDOMEvents('keydown', fakeKey);
+      showStatus('DOM: kc=' + code, '#f90');
     }
   }
 
@@ -140,14 +162,13 @@
     targets.forEach(function(t) {
       try { t.dispatchEvent(new KeyboardEvent(type, init)); } catch(e) {}
     });
-    // jQuery trigger if available
     if (window.$ || window.jQuery) {
       var jq = window.$ || window.jQuery;
       try { jq(document).trigger(jq.Event(type, init)); } catch(e) {}
     }
   }
 
-  // ── Layout ──
+  // ── Full Keyboard Layout ──
   var ROWS = [
     [
       { key:'Escape',code:'Escape',kc:27,label:'Esc',w:1.5 },
@@ -198,9 +219,27 @@
     ],
   ];
 
+  // ── D-Pad Layout (DCSS vi-keys: 8 directions + wait) ──
+  var DPAD = [
+    [ {label:'y',char:'y',desc:'↖'}, {label:'k',char:'k',desc:'↑'}, {label:'u',char:'u',desc:'↗'} ],
+    [ {label:'h',char:'h',desc:'←'}, {label:'.',char:'.',desc:'wait'}, {label:'l',char:'l',desc:'→'} ],
+    [ {label:'b',char:'b',desc:'↙'}, {label:'j',char:'j',desc:'↓'}, {label:'n',char:'n',desc:'↘'} ],
+  ];
+
+  // ── Action Buttons (DCSS essential commands) ──
+  var ACTIONS = [
+    [ {label:'Tab',keycode:9,desc:'Auto-fight'}, {label:'o',char:'o',desc:'Auto-explore'}, {label:'>',char:'>',desc:'Descend'}, {label:'<',char:'<',desc:'Ascend'} ],
+    [ {label:'i',char:'i',desc:'Inventory'}, {label:'g',char:'g',desc:'Pick up'}, {label:'5',char:'5',desc:'Rest'}, {label:'Esc',keycode:27,desc:'Cancel'} ],
+    [ {label:'Ctrl',mod:'ctrl',desc:'Modifier'}, {label:'Shift',mod:'shift',desc:'Modifier'}, {label:'@',char:'@',desc:'Status'}, {label:'\\',char:'\\',desc:'Known'} ],
+  ];
+
   var shift=false, ctrl=false, alt=false, caps=false;
   var touches = new Map();
   var mouseBtn = null;
+
+  // ── Zoom State ──
+  var zoomLevel = 100;
+  var ZOOM_MIN = 25, ZOOM_MAX = 300, ZOOM_STEP = 10;
 
   // ── CSS ──
   var css = document.createElement('style');
@@ -222,11 +261,47 @@
     +'.sp-k.w18{flex:1.8;}'
     +'.sp-k.w20{flex:2;}'
     +'.sp-k.w22{flex:2.2;}'
-    +'#sp-toggle{position:fixed;bottom:10px;right:10px;z-index:999998;width:48px;height:48px;'
-    +'border-radius:50%;background:rgba(37,99,235,.9);border:2px solid #5af;color:#fff;'
-    +'font-size:24px;cursor:pointer;display:flex;align-items:center;justify-content:center;'
-    +'-webkit-tap-highlight-color:transparent;box-shadow:0 2px 8px rgba(0,0,0,.4);}'
-    +'#sp-toggle.kb-open{background:rgba(220,50,50,.9);border-color:#f66;}'
+    // Toggle button bar (bottom-right)
+    +'#sp-btn-bar{position:fixed;bottom:10px;right:10px;z-index:999998;display:flex;gap:6px;'
+    +'align-items:center;}'
+    +'.sp-ctrl-btn{width:44px;height:44px;border-radius:50%;border:2px solid #5af;color:#fff;'
+    +'font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;'
+    +'-webkit-tap-highlight-color:transparent;box-shadow:0 2px 8px rgba(0,0,0,.4);'
+    +'background:rgba(37,99,235,.9);touch-action:manipulation;}'
+    +'.sp-ctrl-btn.active{background:rgba(220,50,50,.9);border-color:#f66;}'
+    +'.sp-ctrl-btn.mode-ws{background:rgba(0,140,60,.9);border-color:#0a6;}'
+    +'.sp-ctrl-btn.mode-dom{background:rgba(180,100,0,.9);border-color:#f90;}'
+    +'.sp-ctrl-btn.zoom{width:36px;height:36px;font-size:20px;font-weight:700;border-radius:8px;'
+    +'background:rgba(60,60,60,.9);border:1px solid #666;}'
+    +'#sp-zoom-label{color:#ccc;font-size:12px;font-family:monospace;background:rgba(0,0,0,.5);'
+    +'padding:2px 6px;border-radius:4px;pointer-events:none;}'
+    // D-Pad panel
+    +'#sp-dpad-panel{position:fixed;z-index:999997;touch-action:manipulation;'
+    +'-webkit-user-select:none;user-select:none;}'
+    +'#sp-dpad-wrap{display:flex;gap:8px;align-items:flex-start;}'
+    // D-Pad grid
+    +'#sp-dpad{display:grid;grid-template-columns:repeat(3,1fr);gap:3px;}'
+    +'.sp-dp{display:flex;align-items:center;justify-content:center;width:52px;height:52px;'
+    +'background:rgba(70,70,70,.6);border:1px solid rgba(150,150,150,.4);border-radius:10px;'
+    +'color:#eee;font-size:18px;font-weight:600;cursor:pointer;touch-action:manipulation;'
+    +'-webkit-tap-highlight-color:transparent;transition:background .08s;}'
+    +'.sp-dp:active,.sp-dp.pressed{background:rgba(106,159,255,.7);border-color:#88b4ff;}'
+    +'.sp-dp.center{background:rgba(50,50,50,.6);font-size:22px;}'
+    // Action grid
+    +'#sp-actions{display:grid;grid-template-columns:repeat(4,1fr);gap:3px;}'
+    +'.sp-act{display:flex;align-items:center;justify-content:center;width:52px;height:52px;'
+    +'background:rgba(50,80,50,.6);border:1px solid rgba(100,180,100,.4);border-radius:10px;'
+    +'color:#eee;font-size:13px;font-weight:600;cursor:pointer;touch-action:manipulation;'
+    +'-webkit-tap-highlight-color:transparent;transition:background .08s;}'
+    +'.sp-act:active,.sp-act.pressed{background:rgba(100,200,100,.7);border-color:#8f8;}'
+    +'.sp-act.mod-btn{background:rgba(60,50,20,.6);border-color:rgba(180,150,50,.4);}'
+    +'.sp-act.mod-btn.active{background:rgba(217,119,6,.7);border-color:#f59e0b;}'
+    // Drag handle
+    +'.sp-drag-handle{width:100%;height:16px;background:rgba(255,255,255,.1);border-radius:8px 8px 0 0;'
+    +'cursor:grab;display:flex;align-items:center;justify-content:center;margin-bottom:4px;}'
+    +'.sp-drag-handle::after{content:"";width:30px;height:3px;background:rgba(255,255,255,.3);'
+    +'border-radius:2px;}'
+    // Existing indicators
     +'#sp-indicator{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);'
     +'background:rgba(0,0,0,.7);color:#fff;padding:8px 18px;border-radius:8px;font-size:18px;'
     +'font-weight:600;z-index:1000000;pointer-events:none;opacity:0;transition:opacity .15s;}'
@@ -236,41 +311,186 @@
     +'pointer-events:none;opacity:0;transition:opacity .3s;}'
     +'#sp-status.show{opacity:1;}'
     +'@media(orientation:landscape){.sp-k{height:38px;font-size:13px;}'
-    +'#sp-overlay{padding:2px 3px env(safe-area-inset-bottom,2px);}}';
+    +'#sp-overlay{padding:2px 3px env(safe-area-inset-bottom,2px);}'
+    +'.sp-dp{width:44px;height:44px;font-size:15px;}'
+    +'.sp-act{width:44px;height:44px;font-size:11px;}}';
   document.head.appendChild(css);
 
   // ── Status indicator ──
   var status = document.createElement('div');
   status.id = 'sp-status';
+  status.setAttribute('style', 'position:fixed !important;top:10px !important;right:10px !important;z-index:2147483647 !important;'
+    +'background:rgba(0,0,0,.7) !important;color:#0f0 !important;padding:4px 8px !important;border-radius:4px !important;'
+    +'font-size:11px !important;font-family:monospace !important;pointer-events:none !important;'
+    +'opacity:0 !important;transition:opacity .3s !important;visibility:visible !important;');
   document.body.appendChild(status);
   var statusTimer = null;
   function showStatus(msg, color) {
     status.textContent = msg;
     status.style.color = color || '#0f0';
-    status.classList.add('show');
+    status.style.opacity = '1';
     clearTimeout(statusTimer);
-    statusTimer = setTimeout(function() { status.classList.remove('show'); }, 2000);
+    statusTimer = setTimeout(function() { status.style.opacity = '0'; }, 2000);
   }
 
   // ── Key indicator ──
   var indicator = document.createElement('div');
   indicator.id = 'sp-indicator';
+  indicator.setAttribute('style', 'position:fixed !important;top:50% !important;left:50% !important;transform:translate(-50%,-50%) !important;'
+    +'background:rgba(0,0,0,.7) !important;color:#fff !important;padding:8px 18px !important;border-radius:8px !important;'
+    +'font-size:18px !important;font-weight:600 !important;z-index:2147483647 !important;pointer-events:none !important;'
+    +'opacity:0 !important;transition:opacity .15s !important;visibility:visible !important;');
   document.body.appendChild(indicator);
   var indTimer = null;
   function showIndicator(key) {
     var map = {' ':'Space','Escape':'Esc','Backspace':'⌫','ArrowLeft':'←',
       'ArrowRight':'→','ArrowUp':'↑','ArrowDown':'↓','Control':'Ctrl','CapsLock':'Caps'};
     indicator.textContent = map[key] || key;
-    indicator.classList.add('show');
+    indicator.style.opacity = '1';
     clearTimeout(indTimer);
-    indTimer = setTimeout(function() { indicator.classList.remove('show'); }, 300);
+    indTimer = setTimeout(function() { indicator.style.opacity = '0'; }, 300);
   }
 
-  // ── Toggle button ──
-  var toggle = document.createElement('button');
-  toggle.id = 'sp-toggle';
-  toggle.textContent = '⌨';
-  document.body.appendChild(toggle);
+  // ── Button Bar (bottom-right) — all inline styles to override page CSS ──
+  var BTN_BASE = 'display:flex !important;align-items:center !important;justify-content:center !important;'
+    +'cursor:pointer !important;touch-action:manipulation !important;-webkit-tap-highlight-color:transparent !important;'
+    +'box-shadow:0 2px 8px rgba(0,0,0,.4) !important;color:#fff !important;font-family:system-ui,sans-serif !important;'
+    +'margin:0 !important;padding:0 !important;line-height:1 !important;visibility:visible !important;opacity:1 !important;'
+    +'position:relative !important;float:none !important;';
+  var BTN_ROUND = BTN_BASE + 'width:44px !important;height:44px !important;min-width:44px !important;min-height:44px !important;'
+    +'border-radius:50% !important;border:2px solid #5af !important;background:rgba(37,99,235,.9) !important;font-size:18px !important;';
+  var BTN_ZOOM = BTN_BASE + 'width:36px !important;height:36px !important;min-width:36px !important;min-height:36px !important;'
+    +'border-radius:8px !important;border:1px solid #666 !important;background:rgba(60,60,60,.9) !important;font-size:20px !important;font-weight:700 !important;';
+
+  var btnBar = document.createElement('div');
+  btnBar.id = 'sp-btn-bar';
+  btnBar.setAttribute('style', 'position:fixed !important;bottom:10px !important;right:10px !important;z-index:2147483647 !important;'
+    +'display:flex !important;gap:6px !important;align-items:center !important;visibility:visible !important;opacity:1 !important;'
+    +'pointer-events:auto !important;transform:none !important;');
+
+  var zoomOutBtn = document.createElement('button');
+  zoomOutBtn.setAttribute('style', BTN_ZOOM);
+  zoomOutBtn.textContent = '\u2212';
+  zoomOutBtn.title = 'Zoom Out';
+
+  var zoomLabel = document.createElement('span');
+  zoomLabel.id = 'sp-zoom-label';
+  zoomLabel.setAttribute('style', 'color:#ccc !important;font-size:12px !important;font-family:monospace !important;'
+    +'background:rgba(0,0,0,.5) !important;padding:2px 6px !important;border-radius:4px !important;'
+    +'pointer-events:none !important;visibility:visible !important;opacity:1 !important;display:inline-block !important;');
+  zoomLabel.textContent = '100%';
+
+  var zoomInBtn = document.createElement('button');
+  zoomInBtn.setAttribute('style', BTN_ZOOM);
+  zoomInBtn.textContent = '+';
+  zoomInBtn.title = 'Zoom In';
+
+  var zoomResetBtn = document.createElement('button');
+  zoomResetBtn.setAttribute('style', BTN_ZOOM + 'font-size:13px !important;');
+  zoomResetBtn.textContent = 'R';
+  zoomResetBtn.title = 'Reset Zoom';
+
+  var modeToggle = document.createElement('button');
+  modeToggle.setAttribute('style', BTN_ROUND + 'background:rgba(0,140,60,.9) !important;border-color:#0a6 !important;font-size:12px !important;font-weight:700 !important;');
+  modeToggle.textContent = 'WS';
+  modeToggle.title = 'Mode: WebSocket (tap to switch)';
+
+  var gamepadToggle = document.createElement('button');
+  gamepadToggle.setAttribute('style', BTN_ROUND);
+  gamepadToggle.textContent = '\uD83C\uDFAE';
+  gamepadToggle.title = 'D-Pad + Actions';
+
+  var kbToggle = document.createElement('button');
+  kbToggle.setAttribute('style', BTN_ROUND);
+  kbToggle.textContent = '\u2328';
+  kbToggle.title = 'Full Keyboard';
+
+  btnBar.appendChild(zoomOutBtn);
+  btnBar.appendChild(zoomLabel);
+  btnBar.appendChild(zoomInBtn);
+  btnBar.appendChild(zoomResetBtn);
+  btnBar.appendChild(modeToggle);
+  btnBar.appendChild(gamepadToggle);
+  btnBar.appendChild(kbToggle);
+  document.body.appendChild(btnBar);
+
+  // ── Mode Toggle Handler ──
+  modeToggle.addEventListener('click', function(e) {
+    e.stopPropagation();
+    if (sendMode === 'ws') {
+      sendMode = 'dom';
+      modeToggle.textContent = 'DOM';
+      modeToggle.setAttribute('style', BTN_ROUND + 'background:rgba(180,100,0,.9) !important;border-color:#f90 !important;font-size:12px !important;font-weight:700 !important;');
+      modeToggle.title = 'Mode: DOM Events (tap to switch)';
+      showStatus('Mode: DOM', '#f90');
+    } else {
+      sendMode = 'ws';
+      modeToggle.textContent = 'WS';
+      modeToggle.setAttribute('style', BTN_ROUND + 'background:rgba(0,140,60,.9) !important;border-color:#0a6 !important;font-size:12px !important;font-weight:700 !important;');
+      modeToggle.title = 'Mode: WebSocket (tap to switch)';
+      if (!gameSocket || gameSocket.readyState !== WebSocket.OPEN) {
+        findExistingSocket();
+      }
+      if (gameSocket && gameSocket.readyState === WebSocket.OPEN) {
+        showStatus('Mode: WS (connected)', '#0f0');
+      } else {
+        showStatus('Mode: WS (no socket yet)', '#ff0');
+      }
+    }
+  });
+
+  // ── Zoom Functions ──
+  function applyZoom() {
+    document.body.style.transformOrigin = 'top left';
+    document.body.style.transform = 'scale(' + (zoomLevel / 100) + ')';
+    document.body.style.width = (10000 / zoomLevel) + '%';
+    zoomLabel.textContent = zoomLevel + '%';
+    // Keep our UI elements at original scale
+    var invScale = 100 / zoomLevel;
+    btnBar.style.transform = 'scale(' + invScale + ')';
+    btnBar.style.transformOrigin = 'bottom right';
+    status.style.transform = 'scale(' + invScale + ')';
+    status.style.transformOrigin = 'top right';
+    indicator.style.transform = 'scale(' + invScale + ')';
+    if (dpadPanel.style.display !== 'none') {
+      dpadPanel.style.transform = 'scale(' + invScale + ')';
+    }
+    if (kb.style.display !== 'none') {
+      kb.style.transform = 'scale(' + invScale + ')';
+      kb.style.transformOrigin = 'bottom left';
+    }
+  }
+
+  zoomInBtn.addEventListener('click', function(e) {
+    e.stopPropagation();
+    if (zoomLevel < ZOOM_MAX) {
+      zoomLevel += ZOOM_STEP;
+      applyZoom();
+      showStatus('Zoom: ' + zoomLevel + '%', '#5af');
+    }
+  });
+  zoomOutBtn.addEventListener('click', function(e) {
+    e.stopPropagation();
+    if (zoomLevel > ZOOM_MIN) {
+      zoomLevel -= ZOOM_STEP;
+      applyZoom();
+      showStatus('Zoom: ' + zoomLevel + '%', '#5af');
+    }
+  });
+  zoomResetBtn.addEventListener('click', function(e) {
+    e.stopPropagation();
+    zoomLevel = 100;
+    document.body.style.transform = '';
+    document.body.style.width = '';
+    document.body.style.transformOrigin = '';
+    zoomLabel.textContent = '100%';
+    btnBar.style.transform = '';
+    status.style.transform = '';
+    indicator.style.transform = '';
+    dpadPanel.style.transform = '';
+    kb.style.transform = '';
+    showStatus('Zoom: Reset', '#5af');
+  });
 
   // ── Keyboard container ──
   var kb = document.createElement('div');
@@ -281,6 +501,232 @@
   kb.appendChild(rows);
   document.body.appendChild(kb);
 
+  // ── D-Pad + Actions Panel ──
+  var dpadPanel = document.createElement('div');
+  dpadPanel.id = 'sp-dpad-panel';
+  dpadPanel.style.display = 'none';
+  dpadPanel.style.bottom = '70px';
+  dpadPanel.style.left = '10px';
+
+  // Drag handle
+  var dragHandle = document.createElement('div');
+  dragHandle.className = 'sp-drag-handle';
+  dpadPanel.appendChild(dragHandle);
+
+  var dpadWrap = document.createElement('div');
+  dpadWrap.id = 'sp-dpad-wrap';
+
+  // Build D-Pad
+  var dpadGrid = document.createElement('div');
+  dpadGrid.id = 'sp-dpad';
+  DPAD.forEach(function(row, ri) {
+    row.forEach(function(def, ci) {
+      var btn = document.createElement('button');
+      btn.className = 'sp-dp';
+      if (ri === 1 && ci === 1) btn.classList.add('center');
+      btn.textContent = def.label;
+      btn.title = def.desc;
+      btn.dataset.char = def.char;
+      dpadGrid.appendChild(btn);
+    });
+  });
+  dpadWrap.appendChild(dpadGrid);
+
+  // Build Action buttons
+  var actGrid = document.createElement('div');
+  actGrid.id = 'sp-actions';
+  ACTIONS.forEach(function(row) {
+    row.forEach(function(def) {
+      var btn = document.createElement('button');
+      btn.className = 'sp-act';
+      if (def.mod) {
+        btn.classList.add('mod-btn');
+        btn.dataset.mod = def.mod;
+      }
+      btn.textContent = def.label;
+      btn.title = def.desc;
+      if (def.char) btn.dataset.char = def.char;
+      if (def.keycode !== undefined) btn.dataset.keycode = def.keycode;
+      actGrid.appendChild(btn);
+    });
+  });
+  dpadWrap.appendChild(actGrid);
+  dpadPanel.appendChild(dpadWrap);
+  document.body.appendChild(dpadPanel);
+
+  // ── D-Pad / Action button press handler ──
+  function pressDpadBtn(btn) {
+    showIndicator(btn.textContent);
+    if (btn.dataset.mod) {
+      // Toggle modifier state
+      toggleMod(btn.dataset.mod);
+      // Update visual state on action mod buttons
+      dpadPanel.querySelectorAll('.sp-act.mod-btn').forEach(function(b) {
+        var m = b.dataset.mod;
+        var a = false;
+        if (m === 'ctrl') a = ctrl;
+        else if (m === 'shift') a = shift;
+        b.classList.toggle('active', a);
+      });
+      return;
+    }
+    if (btn.dataset.keycode) {
+      var kc = parseInt(btn.dataset.keycode, 10);
+      // If ctrl is active and we're sending a keycode-based key, handle specially
+      if (ctrl && kc !== 27) {
+        // For Tab with Ctrl, send Ctrl+I (keycode 9)
+        sendKeycode(kc);
+      } else {
+        sendKeycode(kc);
+      }
+      // Reset modifiers after use (if not a modifier button itself)
+      if (ctrl) { ctrl = false; updateModButtons(); }
+      if (shift) { shift = false; updateModButtons(); }
+    } else if (btn.dataset.char) {
+      var ch = btn.dataset.char;
+      // Apply modifiers
+      if (shift && ch.length === 1 && ch >= 'a' && ch <= 'z') {
+        ch = ch.toUpperCase();
+      } else if (shift && ch === '.') {
+        ch = '>'; // shift+. = > (descend)
+      } else if (shift && ch === ',') {
+        ch = '<'; // shift+, = < (ascend)
+      }
+      if (ctrl && ch.length === 1) {
+        var code = ch.toUpperCase().charCodeAt(0);
+        if (code >= 65 && code <= 90) {
+          sendKeycode(code - 64);
+          ctrl = false; updateModButtons();
+          return;
+        }
+      }
+      sendChar(ch);
+      // Reset modifiers after use
+      if (ctrl) { ctrl = false; updateModButtons(); }
+      if (shift) { shift = false; updateModButtons(); }
+    }
+  }
+
+  function updateModButtons() {
+    updateMods();
+    updateLabels();
+    dpadPanel.querySelectorAll('.sp-act.mod-btn').forEach(function(b) {
+      var m = b.dataset.mod;
+      var a = false;
+      if (m === 'ctrl') a = ctrl;
+      else if (m === 'shift') a = shift;
+      b.classList.toggle('active', a);
+    });
+  }
+
+  // ── D-Pad Touch/Mouse Handlers ──
+  var dpadTouches = new Map();
+  var dpadMouseBtn = null;
+
+  dpadPanel.addEventListener('touchstart', function(e) {
+    var t0 = e.changedTouches[0];
+    var el = document.elementFromPoint(t0.clientX, t0.clientY);
+    // If touching drag handle, don't prevent default for drag
+    if (el && (el === dragHandle || el.closest('.sp-drag-handle'))) return;
+    e.preventDefault(); e.stopPropagation();
+    for (var i = 0; i < e.changedTouches.length; i++) {
+      var t = e.changedTouches[i];
+      el = document.elementFromPoint(t.clientX, t.clientY);
+      var btn = el && (el.closest('.sp-dp') || el.closest('.sp-act'));
+      if (!btn) continue;
+      btn.classList.add('pressed');
+      dpadTouches.set(t.identifier, btn);
+      pressDpadBtn(btn);
+    }
+  }, { passive: false, capture: true });
+
+  dpadPanel.addEventListener('touchend', function(e) {
+    e.preventDefault(); e.stopPropagation();
+    for (var i = 0; i < e.changedTouches.length; i++) {
+      var t = e.changedTouches[i];
+      var btn = dpadTouches.get(t.identifier);
+      if (btn) { btn.classList.remove('pressed'); dpadTouches.delete(t.identifier); }
+    }
+  }, { passive: false, capture: true });
+
+  dpadPanel.addEventListener('touchcancel', function(e) {
+    for (var i = 0; i < e.changedTouches.length; i++) {
+      var t = e.changedTouches[i];
+      var btn = dpadTouches.get(t.identifier);
+      if (btn) { btn.classList.remove('pressed'); dpadTouches.delete(t.identifier); }
+    }
+  }, { passive: false });
+
+  dpadPanel.addEventListener('mousedown', function(e) {
+    var btn = e.target.closest('.sp-dp') || e.target.closest('.sp-act');
+    if (!btn) return;
+    e.preventDefault(); e.stopPropagation();
+    btn.classList.add('pressed');
+    dpadMouseBtn = btn;
+    pressDpadBtn(btn);
+  });
+  document.addEventListener('mouseup', function() {
+    if (dpadMouseBtn) {
+      dpadMouseBtn.classList.remove('pressed');
+      dpadMouseBtn = null;
+    }
+  });
+
+  // ── D-Pad Drag to Reposition ──
+  var dragState = { active: false, startX: 0, startY: 0, origX: 0, origY: 0 };
+
+  dragHandle.addEventListener('touchstart', function(e) {
+    e.preventDefault();
+    var t = e.changedTouches[0];
+    var rect = dpadPanel.getBoundingClientRect();
+    dragState.active = true;
+    dragState.startX = t.clientX;
+    dragState.startY = t.clientY;
+    dragState.origX = rect.left;
+    dragState.origY = rect.top;
+  }, { passive: false });
+
+  document.addEventListener('touchmove', function(e) {
+    if (!dragState.active) return;
+    var t = e.changedTouches[0];
+    var dx = t.clientX - dragState.startX;
+    var dy = t.clientY - dragState.startY;
+    dpadPanel.style.left = (dragState.origX + dx) + 'px';
+    dpadPanel.style.top = (dragState.origY + dy) + 'px';
+    dpadPanel.style.bottom = 'auto';
+    dpadPanel.style.right = 'auto';
+  }, { passive: true });
+
+  document.addEventListener('touchend', function() {
+    dragState.active = false;
+  });
+
+  // Mouse drag
+  dragHandle.addEventListener('mousedown', function(e) {
+    e.preventDefault();
+    var rect = dpadPanel.getBoundingClientRect();
+    dragState.active = true;
+    dragState.startX = e.clientX;
+    dragState.startY = e.clientY;
+    dragState.origX = rect.left;
+    dragState.origY = rect.top;
+  });
+
+  document.addEventListener('mousemove', function(e) {
+    if (!dragState.active) return;
+    var dx = e.clientX - dragState.startX;
+    var dy = e.clientY - dragState.startY;
+    dpadPanel.style.left = (dragState.origX + dx) + 'px';
+    dpadPanel.style.top = (dragState.origY + dy) + 'px';
+    dpadPanel.style.bottom = 'auto';
+    dpadPanel.style.right = 'auto';
+  });
+
+  document.addEventListener('mouseup', function() {
+    dragState.active = false;
+  });
+
+  // ── Helper functions for full keyboard ──
   function effectiveKey(k) {
     var base = k.key;
     var s = k.s;
@@ -358,25 +804,15 @@
       var k = JSON.parse(btn.dataset.idx);
       var ek = effectiveKey(k);
       showIndicator(ek);
-
-      // Try to find socket if not found yet
-      if (!gameSocket || gameSocket.readyState !== WebSocket.OPEN) {
-        findExistingSocket();
-      }
-
       sendToCrawl(k);
-
-      if (gameSocket && gameSocket.readyState === WebSocket.OPEN) {
-        showStatus('WS: ' + ek, '#0f0');
-      } else {
-        showStatus('DOM: ' + ek, '#f90');
-      }
+      showStatus((sendMode === 'ws' ? 'WS' : 'DOM') + ': ' + ek,
+                  sendMode === 'ws' ? '#0f0' : '#f90');
     } catch(e) {
       showStatus('ERR: ' + e.message, '#f00');
     }
   }
 
-  // ── Touch ──
+  // ── Full Keyboard Touch ──
   rows.addEventListener('touchstart', function(e) {
     e.preventDefault(); e.stopPropagation();
     for (var i = 0; i < e.changedTouches.length; i++) {
@@ -406,7 +842,7 @@
     }
   }, { passive: false });
 
-  // ── Mouse ──
+  // ── Full Keyboard Mouse ──
   rows.addEventListener('mousedown', function(e) {
     var btn = e.target.closest('.sp-k');
     if (!btn) return;
@@ -422,27 +858,44 @@
     mouseBtn = null;
   });
 
-  // ── Toggle ──
+  // ── Toggle: Gamepad (D-Pad + Actions) ──
+  var dpadVisible = false;
+  gamepadToggle.addEventListener('click', function(e) {
+    e.stopPropagation();
+    dpadVisible = !dpadVisible;
+    dpadPanel.style.display = dpadVisible ? '' : 'none';
+    if (dpadVisible) {
+      gamepadToggle.setAttribute('style', BTN_ROUND + 'background:rgba(220,50,50,.9) !important;border-color:#f66 !important;');
+      if (zoomLevel !== 100) {
+        var invScale = 100 / zoomLevel;
+        dpadPanel.style.transform = 'scale(' + invScale + ')';
+        dpadPanel.style.transformOrigin = 'bottom left';
+      }
+    } else {
+      gamepadToggle.setAttribute('style', BTN_ROUND);
+    }
+  });
+
+  // ── Toggle: Full Keyboard ──
   var kbVisible = false;
-  toggle.addEventListener('click', function(e) {
+  kbToggle.addEventListener('click', function(e) {
     e.stopPropagation();
     kbVisible = !kbVisible;
     kb.style.display = kbVisible ? '' : 'none';
-    toggle.textContent = kbVisible ? '✕' : '⌨';
-    toggle.classList.toggle('kb-open', kbVisible);
     if (kbVisible) {
-      toggle.style.bottom = (kb.offsetHeight + 10) + 'px';
-      if (gameSocket && gameSocket.readyState === WebSocket.OPEN) {
-        showStatus('WebSocket 연결됨', '#0f0');
-      } else {
-        findExistingSocket();
-        showStatus(gameSocket ? 'WebSocket 연결됨' : 'WebSocket 미발견 (DOM 모드)', '#f90');
+      kbToggle.setAttribute('style', BTN_ROUND + 'background:rgba(220,50,50,.9) !important;border-color:#f66 !important;');
+      btnBar.style.bottom = (kb.offsetHeight + 10) + 'px';
+      if (zoomLevel !== 100) {
+        var invScale = 100 / zoomLevel;
+        kb.style.transform = 'scale(' + invScale + ')';
+        kb.style.transformOrigin = 'bottom left';
       }
     } else {
-      toggle.style.bottom = '10px';
+      kbToggle.setAttribute('style', BTN_ROUND);
+      btnBar.style.bottom = '10px';
     }
   });
 
   buildKeys();
-  showStatus('ScreenPad 로드됨', '#5af');
+  showStatus('ScreenPad v2 로드됨', '#5af');
 })();
