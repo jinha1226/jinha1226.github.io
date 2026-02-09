@@ -222,9 +222,9 @@
 
   // ── D-Pad Layout (DCSS vi-keys: 8 directions + wait) ──
   var DPAD = [
-    [ {label:'y',char:'y',desc:'↖'}, {label:'k',char:'k',desc:'↑'}, {label:'u',char:'u',desc:'↗'} ],
-    [ {label:'h',char:'h',desc:'←'}, {label:'.',char:'.',desc:'wait'}, {label:'l',char:'l',desc:'→'} ],
-    [ {label:'b',char:'b',desc:'↙'}, {label:'j',char:'j',desc:'↓'}, {label:'n',char:'n',desc:'↘'} ],
+    [ {label:'↖\ny',char:'y',desc:'↖'}, {label:'↑\nk',char:'k',desc:'↑'}, {label:'↗\nu',char:'u',desc:'↗'} ],
+    [ {label:'←\nh',char:'h',desc:'←'}, {label:'·\nwait',char:'.',desc:'wait'}, {label:'→\nl',char:'l',desc:'→'} ],
+    [ {label:'↙\nb',char:'b',desc:'↙'}, {label:'↓\nj',char:'j',desc:'↓'}, {label:'↘\nn',char:'n',desc:'↘'} ],
   ];
 
   // ── Action Buttons (DCSS essential commands) — 5 columns ──
@@ -246,15 +246,15 @@
 
   // ── CSS ──
   var css = document.createElement('style');
-  css.textContent = '#sp-overlay{position:fixed;bottom:0;left:0;right:0;z-index:999999;'
-    +'background:rgba(30,30,30,.88);border-top:1px solid #444;padding:4px 3px env(safe-area-inset-bottom,4px);'
+  css.textContent = '#sp-overlay{position:fixed;z-index:999999;'
+    +'background:rgba(20,20,20,.65);border-radius:12px;padding:4px 3px;'
     +'backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);font-family:system-ui,sans-serif;'
     +'touch-action:manipulation;-webkit-user-select:none;user-select:none;}'
     +'#sp-rows{display:flex;flex-direction:column;gap:3px;}'
     +'.sp-row{display:flex;gap:3px;justify-content:center;padding:0 2px;}'
-    +'.sp-k{display:inline-flex;align-items:center;justify-content:center;height:52px;min-width:0;'
-    +'flex:1;padding:0 2px;background:#4a4a4a;border:1px solid #666;border-radius:6px;color:#eee;'
-    +'font-size:18px;font-weight:500;cursor:pointer;touch-action:manipulation;'
+    +'.sp-k{display:inline-flex;align-items:center;justify-content:center;height:64px;min-width:0;'
+    +'flex:1;padding:0 2px;background:rgba(74,74,74,.8);border:1px solid rgba(102,102,102,.7);border-radius:6px;color:#eee;'
+    +'font-size:21px;font-weight:500;cursor:pointer;touch-action:manipulation;'
     +'-webkit-tap-highlight-color:transparent;transition:background .08s;}'
     +'.sp-k:active,.sp-k.pressed{background:#6a9fff;border-color:#88b4ff;color:#fff;}'
     +'.sp-k.mod{background:#3a3a3a;}'
@@ -284,10 +284,12 @@
     +'border-radius:12px;padding:4px;backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);}'
     // D-Pad grid — 3x3, big buttons
     +'#sp-dpad{display:grid;grid-template-columns:repeat(3,1fr);gap:4px;}'
-    +'.sp-dp{display:flex;align-items:center;justify-content:center;width:68px;height:68px;'
+    +'.sp-dp{display:flex;flex-direction:column;align-items:center;justify-content:center;width:68px;height:68px;'
     +'background:rgba(70,70,70,.7);border:1px solid rgba(150,150,150,.5);border-radius:12px;'
-    +'color:#eee;font-size:22px;font-weight:700;cursor:pointer;touch-action:manipulation;'
-    +'-webkit-tap-highlight-color:transparent;transition:background .08s;}'
+    +'color:#eee;font-size:14px;font-weight:700;cursor:pointer;touch-action:manipulation;'
+    +'-webkit-tap-highlight-color:transparent;transition:background .08s;line-height:1.2;}'
+    +'.sp-dp .arrow{font-size:24px;line-height:1;}'
+    +'.sp-dp .letter{font-size:12px;opacity:.7;line-height:1;}'
     +'.sp-dp:active,.sp-dp.pressed{background:rgba(106,159,255,.8);border-color:#88b4ff;}'
     +'.sp-dp.center{background:rgba(80,80,50,.7);font-size:26px;}'
     // Action grid — 5 columns, big buttons
@@ -313,9 +315,11 @@
     +'color:#0f0;padding:4px 8px;border-radius:4px;font-size:11px;font-family:monospace;'
     +'pointer-events:none;opacity:0;transition:opacity .3s;}'
     +'#sp-status.show{opacity:1;}'
-    +'@media(orientation:landscape){.sp-k{height:44px;font-size:15px;}'
-    +'#sp-overlay{padding:2px 3px env(safe-area-inset-bottom,2px);}'
-    +'.sp-dp{width:56px;height:56px;font-size:18px;}'
+    +'@media(orientation:landscape){.sp-k{height:52px;font-size:17px;}'
+    +'#sp-overlay{padding:2px 3px;}'
+    +'.sp-dp{width:56px;height:56px;}'
+    +'.sp-dp .arrow{font-size:20px;}'
+    +'.sp-dp .letter{font-size:10px;}'
     +'.sp-act{width:50px;height:44px;font-size:12px;}}';
   document.head.appendChild(css);
 
@@ -473,10 +477,18 @@
     showStatus('Zoom: Reset', '#5af');
   });
 
-  // ── Keyboard container ──
+  // ── Keyboard container (draggable floating panel) ──
   var kb = document.createElement('div');
   kb.id = 'sp-overlay';
   kb.style.display = 'none';
+  kb.style.bottom = '10px';
+  kb.style.left = '5px';
+  kb.style.right = '5px';
+
+  var kbDragHandle = document.createElement('div');
+  kbDragHandle.className = 'sp-drag-handle';
+  kb.appendChild(kbDragHandle);
+
   var rows = document.createElement('div');
   rows.id = 'sp-rows';
   kb.appendChild(rows);
@@ -501,7 +513,12 @@
       var btn = document.createElement('button');
       btn.className = 'sp-dp';
       if (ri === 1 && ci === 1) btn.classList.add('center');
-      btn.textContent = def.label;
+      var parts = def.label.split('\n');
+      if (parts.length === 2) {
+        btn.innerHTML = '<span class="arrow">' + parts[0] + '</span><span class="letter">' + parts[1] + '</span>';
+      } else {
+        btn.textContent = def.label;
+      }
       btn.title = def.desc;
       btn.dataset.char = def.char;
       dpadGrid.appendChild(btn);
@@ -544,7 +561,7 @@
 
   // ── D-Pad / Action button press handler ──
   function pressDpadBtn(btn) {
-    showIndicator(btn.textContent);
+    showIndicator(btn.dataset.char || btn.textContent);
     if (btn.dataset.mod) {
       toggleMod(btn.dataset.mod);
       actPanel.querySelectorAll('.sp-act.mod-btn').forEach(function(b) {
@@ -700,6 +717,7 @@
   }
   makeDraggable(dragHandle, dpadPanel);
   makeDraggable(actDragHandle, actPanel);
+  makeDraggable(kbDragHandle, kb);
 
   // ── Helper functions for full keyboard ──
   function effectiveKey(k) {
@@ -851,13 +869,9 @@
     e.stopPropagation();
     kbVisible = !kbVisible;
     kb.style.display = kbVisible ? '' : 'none';
-    if (kbVisible) {
-      kbToggle.setAttribute('style', BTN_ROUND + 'background:rgba(220,50,50,.9) !important;border-color:#f66 !important;');
-      btnBar.style.bottom = (kb.offsetHeight + 10) + 'px';
-    } else {
-      kbToggle.setAttribute('style', BTN_ROUND);
-      btnBar.style.bottom = '10px';
-    }
+    kbToggle.setAttribute('style', kbVisible
+      ? BTN_ROUND + 'background:rgba(220,50,50,.9) !important;border-color:#f66 !important;'
+      : BTN_ROUND);
   });
 
   buildKeys();
