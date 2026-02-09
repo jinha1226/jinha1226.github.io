@@ -19,88 +19,144 @@
     .sub{color:#888;font-size:14px;margin-bottom:30px;text-align:center;}
     .section{background:#1a1a2e;border:1px solid #333;border-radius:12px;padding:20px;margin-bottom:16px;width:100%;max-width:500px;}
     .section h2{font-size:16px;margin-bottom:12px;color:#5af;}
-    .step{margin-bottom:10px;font-size:14px;line-height:1.6;color:#ccc;}
+    .step{margin-bottom:10px;font-size:14px;line-height:1.7;color:#ccc;}
     .step b{color:#fff;}
-    .url-box{background:#222;border:1px solid #444;border-radius:8px;padding:10px;font-size:12px;
-      color:#0f0;word-break:break-all;margin:8px 0;font-family:'SF Mono',monospace;user-select:all;-webkit-user-select:all;}
+    .step .highlight{color:#5af;}
     .btn-row{display:flex;gap:8px;margin-top:16px;}
-    .btn{flex:1;padding:12px;border:none;border-radius:8px;font-size:15px;font-weight:600;cursor:pointer;text-align:center;text-decoration:none;display:block;}
+    .btn{flex:1;padding:14px;border:none;border-radius:8px;font-size:15px;font-weight:600;cursor:pointer;text-align:center;}
     .btn-primary{background:#2563eb;color:#fff;}
     .btn-primary:active{background:#1d4ed8;}
-    .btn-secondary{background:#333;color:#eee;border:1px solid #555;}
-    .btn-secondary:active{background:#444;}
+    .btn-green{background:#16a34a;color:#fff;}
+    .btn-green:active{background:#15803d;}
+    .divider{height:1px;background:#333;margin:16px 0;}
     .demo{padding:16px;text-align:center;}
-    .demo button{padding:10px 24px;background:#2563eb;color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;}
+    .demo button{padding:12px 28px;background:#2563eb;color:#fff;border:none;border-radius:8px;font-size:15px;font-weight:600;cursor:pointer;}
     .demo button:active{background:#1d4ed8;}
-    .note{font-size:12px;color:#666;text-align:center;margin-top:10px;line-height:1.5;}
+    .tag{display:inline-block;background:#333;border:1px solid #555;border-radius:4px;padding:1px 6px;font-size:12px;font-family:monospace;color:#0f0;}
+    .warn{color:#f59e0b;font-size:13px;margin-top:8px;line-height:1.5;}
+    .code-box{background:#0a0a1a;border:1px solid #333;border-radius:6px;padding:10px;margin:10px 0;
+      font-size:11px;color:#0f0;word-break:break-all;font-family:'SF Mono','Menlo',monospace;
+      user-select:all;-webkit-user-select:all;max-height:80px;overflow-y:auto;}
+    .tab-bar{display:flex;gap:0;margin-bottom:0;}
+    .tab{flex:1;padding:10px;text-align:center;font-size:14px;font-weight:600;cursor:pointer;
+      background:#0d0d1a;border:1px solid #333;color:#888;transition:all .2s;}
+    .tab:first-child{border-radius:8px 0 0 0;}
+    .tab:last-child{border-radius:0 8px 0 0;}
+    .tab.active{background:#1a1a2e;color:#5af;border-bottom-color:#1a1a2e;}
+    .tab-content{display:none;}
+    .tab-content.active{display:block;}
   </style>
 </head>
 <body>
   <h1>⌨ ScreenPad</h1>
   <p class="sub">모바일 브라우저 게임용 가상 키보드</p>
 
+  <!-- Step 1: Copy -->
   <div class="section">
-    <h2>사용법</h2>
-    <div class="step"><b>1.</b> 아래 <b>"키보드 코드 복사"</b> 버튼을 탭합니다.</div>
-    <div class="step"><b>2.</b> 게임 사이트로 이동합니다 (예: DCSS 웹타일).</div>
-    <div class="step"><b>3.</b> 주소창을 탭하고, 주소를 지운 뒤 붙여넣기합니다.</div>
-    <div class="step"><b>4.</b> 주소 맨 앞에 <b>javascript:</b> 가 지워졌다면 직접 입력한 뒤 이동합니다.</div>
-    <div class="step"><b>5.</b> 화면 우하단의 <b>⌨ 버튼</b>을 탭하면 키보드가 나타납니다.</div>
-  </div>
-
-  <div class="section">
-    <h2>북마클릿 코드</h2>
-    <div class="url-box" id="bookmarklet-code"></div>
+    <h2>Step 1. 코드 복사</h2>
+    <div class="step">아래 버튼을 눌러 키보드 코드를 복사하세요.</div>
     <div class="btn-row">
-      <button class="btn btn-primary" id="copy-btn">키보드 코드 복사</button>
+      <button class="btn btn-primary" id="copy-btn">📋 키보드 코드 복사</button>
     </div>
-    <p class="note">또는 이 코드를 북마크의 URL로 저장하면<br>한 번의 탭으로 키보드를 불러올 수 있습니다.</p>
+    <div class="code-box" id="code-display"></div>
   </div>
 
-  <div class="section">
-    <h2>바로 열기</h2>
-    <div class="step">게임 URL을 입력하면 키보드가 포함된 페이지를 엽니다.</div>
-    <form id="go-form" style="display:flex;gap:8px;margin-top:12px;">
-      <input type="url" id="go-url" placeholder="https://crawl.nemelex.cards/"
-        style="flex:1;background:#222;border:1px solid #444;border-radius:8px;color:#eee;padding:10px;font-size:14px;outline:none;">
-      <button type="submit" class="btn btn-primary" style="flex:0;padding:10px 18px;">Go</button>
-    </form>
+  <!-- Step 2: Setup bookmark -->
+  <div class="section" style="border-top-left-radius:0;border-top-right-radius:0;">
+    <div class="tab-bar">
+      <div class="tab active" data-tab="safari">Safari (iOS)</div>
+      <div class="tab" data-tab="chrome">Chrome (Android)</div>
+    </div>
+
+    <div class="tab-content active" id="tab-safari">
+      <h2>Step 2. 북마크 설정 (1회)</h2>
+      <div class="step"><b>1.</b> Safari에서 이 페이지의 <b class="highlight">공유 버튼(□↑)</b>을 탭</div>
+      <div class="step"><b>2.</b> <b class="highlight">"북마크 추가"</b> 탭 → 이름을 <b>ScreenPad</b>로 변경 → 저장</div>
+      <div class="step"><b>3.</b> 하단 <b class="highlight">북마크 아이콘(📖)</b> 탭 → 방금 저장한 <b>ScreenPad</b> 북마크를 찾기</div>
+      <div class="step"><b>4.</b> <b class="highlight">"편집"</b> 탭 → ScreenPad 항목의 <b>URL을 전체 삭제</b></div>
+      <div class="step"><b>5.</b> URL 칸에 <b class="highlight">Step 1에서 복사한 코드를 붙여넣기</b> → 완료</div>
+      <div class="divider"></div>
+      <h2>Step 3. 게임에서 사용</h2>
+      <div class="step"><b>1.</b> Safari에서 게임 사이트 접속</div>
+      <div class="step"><b>2.</b> 하단 <b class="highlight">북마크 아이콘(📖)</b> → <b>ScreenPad</b> 탭</div>
+      <div class="step"><b>3.</b> 화면에 <b class="highlight">⌨ 버튼</b> 등장 → 탭하면 키보드!</div>
+    </div>
+
+    <div class="tab-content" id="tab-chrome">
+      <h2>Step 2. 북마크 설정 (1회)</h2>
+      <div class="step"><b>1.</b> Chrome에서 이 페이지를 <b class="highlight">북마크(⭐)</b> 추가</div>
+      <div class="step"><b>2.</b> 우측 상단 <b class="highlight">⋮ 메뉴</b> → <b>북마크</b> → 방금 저장한 항목의 <b>⋮</b> 탭</div>
+      <div class="step"><b>3.</b> <b class="highlight">"수정"</b> → URL을 <b>전체 삭제</b></div>
+      <div class="step"><b>4.</b> URL 칸에 <b class="highlight">Step 1에서 복사한 코드를 붙여넣기</b> → 저장</div>
+      <div class="divider"></div>
+      <h2>Step 3. 게임에서 사용</h2>
+      <div class="step"><b>1.</b> Chrome에서 게임 사이트 접속</div>
+      <div class="step"><b>2.</b> 주소창 탭 → <b class="highlight">"ScreenPad"</b> 북마크 탭</div>
+      <div class="step"><b>3.</b> 화면에 <b class="highlight">⌨ 버튼</b> 등장 → 탭하면 키보드!</div>
+    </div>
   </div>
 
+  <!-- Demo -->
   <div class="section demo">
-    <button id="demo-btn">이 페이지에서 키보드 테스트</button>
+    <button id="demo-btn">🎹 이 페이지에서 테스트</button>
+    <div class="warn" style="margin-top:12px;">테스트: 키를 누르면 아래에 입력됩니다</div>
+    <textarea id="test-output" readonly placeholder="여기에 키 입력이 표시됩니다..."
+      style="width:100%;height:80px;margin-top:8px;background:#0a0a1a;color:#0f0;border:1px solid #333;
+      border-radius:6px;padding:10px;font-family:monospace;font-size:14px;resize:none;outline:none;"></textarea>
   </div>
 
   <script>
     var OVERLAY_URL = 'https://jinha1226.github.io/overlay.js';
     var code = "javascript:void(document.body.appendChild(Object.assign(document.createElement('script'),{src:'" + OVERLAY_URL + "?t='+Date.now()})))";
 
-    document.getElementById('bookmarklet-code').textContent = code;
+    document.getElementById('code-display').textContent = code;
 
     document.getElementById('copy-btn').addEventListener('click', function() {
       navigator.clipboard.writeText(code).then(function() {
-        document.getElementById('copy-btn').textContent = '복사됨!';
-        setTimeout(function() { document.getElementById('copy-btn').textContent = '키보드 코드 복사'; }, 2000);
+        var btn = document.getElementById('copy-btn');
+        btn.textContent = '✅ 복사 완료!';
+        btn.classList.remove('btn-primary');
+        btn.classList.add('btn-green');
+        setTimeout(function() {
+          btn.textContent = '📋 키보드 코드 복사';
+          btn.classList.remove('btn-green');
+          btn.classList.add('btn-primary');
+        }, 3000);
       });
     });
 
+    // Tab switching
+    document.querySelectorAll('.tab').forEach(function(tab) {
+      tab.addEventListener('click', function() {
+        document.querySelectorAll('.tab').forEach(function(t) { t.classList.remove('active'); });
+        document.querySelectorAll('.tab-content').forEach(function(c) { c.classList.remove('active'); });
+        tab.classList.add('active');
+        document.getElementById('tab-' + tab.getAttribute('data-tab')).classList.add('active');
+      });
+    });
+
+    // Demo
     document.getElementById('demo-btn').addEventListener('click', function() {
       var s = document.createElement('script');
       s.src = OVERLAY_URL + '?t=' + Date.now();
       document.body.appendChild(s);
+      this.textContent = '✅ 키보드 활성화됨!';
+      this.style.background = '#16a34a';
     });
 
-    document.getElementById('go-form').addEventListener('submit', function(e) {
-      e.preventDefault();
-      var url = document.getElementById('go-url').value.trim();
-      if (!url) return;
-      if (!/^https?:\/\//i.test(url)) url = 'https://' + url;
-      // Open game with keyboard injected via URL fragment trick
-      window.location.href = url;
-      // After navigation, user needs to run bookmarklet
+    // Listen for keyboard events from overlay (for demo)
+    document.addEventListener('keydown', function(e) {
+      if (e.isTrusted) return;
+      var out = document.getElementById('test-output');
+      if (!out) return;
+      var key = e.key;
+      if (key === 'Backspace') out.value = out.value.slice(0, -1);
+      else if (key === 'Enter') out.value += '\n';
+      else if (key === 'Tab') out.value += '  ';
+      else if (key.length === 1) out.value += key;
+      out.scrollTop = out.scrollHeight;
     });
 
-    // Register SW for PWA install
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.register('./sw.js', { updateViaCache: 'none' });
     }
