@@ -246,10 +246,11 @@
 
   // ── CSS ──
   var css = document.createElement('style');
-  css.textContent = '#sp-overlay{position:fixed;z-index:999999;'
+  css.textContent = '#sp-overlay{position:fixed !important;left:5px !important;right:5px !important;bottom:10px;'
+    +'width:auto !important;z-index:999999;'
     +'background:rgba(10,10,10,.35);border-radius:12px;padding:4px 3px;'
     +'backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);font-family:system-ui,sans-serif;'
-    +'touch-action:manipulation;-webkit-user-select:none;user-select:none;}'
+    +'touch-action:manipulation;-webkit-user-select:none;user-select:none;box-sizing:border-box !important;}'
     +'#sp-rows{display:flex;flex-direction:column;gap:3px;}'
     +'.sp-row{display:flex;gap:3px;justify-content:center;padding:0 2px;}'
     +'.sp-k{display:inline-flex;flex-direction:column;align-items:center;justify-content:center;height:72px;min-width:0;'
@@ -483,9 +484,6 @@
   var kb = document.createElement('div');
   kb.id = 'sp-overlay';
   kb.style.display = 'none';
-  kb.style.bottom = '10px';
-  kb.style.left = '5px';
-  kb.style.right = '5px';
 
   var kbDragHandle = document.createElement('div');
   kbDragHandle.className = 'sp-drag-handle';
