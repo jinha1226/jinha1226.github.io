@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="ScreenPad">
+  <meta name="theme-color" content="#1e1e1e">
+  <title>ScreenPad</title>
+  <link rel="manifest" href="manifest.json">
+  <link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect fill='%231e1e1e' width='100' height='100' rx='20'/><text x='50' y='62' text-anchor='middle' font-size='40'>⌨</text></svg>">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <!-- URL Bar -->
+  <div id="url-bar">
+    <button id="url-toggle" aria-label="Toggle URL bar">▼</button>
+    <div id="url-form-wrap">
+      <form id="url-form">
+        <input type="url" id="url-input" placeholder="Enter game URL..." autocomplete="off" autocapitalize="off">
+        <button type="submit" id="go-btn">Go</button>
+      </form>
+      <div id="url-history-list"></div>
+    </div>
+  </div>
+
+  <!-- Game iframe wrapper (for zoom) -->
+  <div id="frame-wrap">
+    <iframe id="game-frame" allowfullscreen></iframe>
+  </div>
+
+  <!-- Standalone text output (no URL loaded) -->
+  <textarea id="text-output" placeholder="Type using the keyboard below..." readonly></textarea>
+
+  <!-- Floating controls -->
+  <div id="float-controls">
+    <button id="kb-toggle" aria-label="Toggle keyboard">⌨</button>
+    <button id="zoom-out" aria-label="Zoom out">−</button>
+    <span id="zoom-label">100%</span>
+    <button id="zoom-in" aria-label="Zoom in">+</button>
+    <button id="zoom-reset" aria-label="Reset zoom">↺</button>
+  </div>
+
+  <!-- Opacity slider -->
+  <div id="opacity-control" class="hidden">
+    <label>Opacity: <input type="range" id="opacity-slider" min="20" max="100" value="85"></label>
+  </div>
+
+  <!-- Key event indicator -->
+  <div id="key-indicator"></div>
+
+  <!-- Keyboard overlay -->
+  <div id="keyboard" class="hidden">
+    <div id="kb-toolbar">
+      <button id="fn-toggle" title="Toggle F-keys">F1-F12</button>
+      <button id="opacity-toggle" title="Adjust opacity">◐</button>
+      <button id="kb-close" title="Hide keyboard">✕</button>
+    </div>
+    <div id="kb-rows"></div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>

@@ -1,0 +1,402 @@
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html, body {
+  height: 100%;
+  overflow: hidden;
+  background: #111;
+  color: #eee;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+  touch-action: manipulation;
+}
+
+/* ── URL Bar ── */
+#url-bar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 1000;
+  background: rgba(25, 25, 25, 0.95);
+  border-bottom: 1px solid #333;
+  padding: env(safe-area-inset-top, 0) 4px 4px 4px;
+  transition: transform 0.25s ease;
+}
+
+#url-bar.collapsed #url-form-wrap {
+  display: none;
+}
+
+#url-toggle {
+  display: block;
+  width: 100%;
+  background: none;
+  border: none;
+  color: #888;
+  font-size: 12px;
+  padding: 2px;
+  cursor: pointer;
+}
+
+#url-bar.collapsed #url-toggle {
+  padding: 4px;
+}
+
+#url-form {
+  display: flex;
+  gap: 4px;
+  padding: 4px 0;
+}
+
+#url-input {
+  flex: 1;
+  background: #2a2a2a;
+  border: 1px solid #444;
+  border-radius: 6px;
+  color: #eee;
+  padding: 6px 10px;
+  font-size: 14px;
+  outline: none;
+}
+
+#url-input:focus {
+  border-color: #5af;
+}
+
+#go-btn {
+  background: #2563eb;
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  padding: 6px 14px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+#go-btn:active {
+  background: #1d4ed8;
+}
+
+#url-history-list {
+  display: flex;
+  gap: 4px;
+  overflow-x: auto;
+  padding: 2px 0;
+  scrollbar-width: none;
+}
+
+#url-history-list::-webkit-scrollbar {
+  display: none;
+}
+
+#url-history-list .history-item {
+  background: #2a2a2a;
+  border: 1px solid #444;
+  border-radius: 4px;
+  padding: 2px 8px;
+  font-size: 11px;
+  color: #aaa;
+  white-space: nowrap;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+#url-history-list .history-item:active {
+  background: #3a3a3a;
+}
+
+/* ── Game iframe wrapper ── */
+#frame-wrap {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  overflow: hidden;
+  background: #000;
+  transform-origin: top left;
+}
+
+#game-frame {
+  width: 100%;
+  height: 100%;
+  border: none;
+  background: #000;
+  display: block;
+}
+
+/* ── Standalone text output ── */
+#text-output {
+  position: fixed;
+  top: 50px;
+  left: 10px;
+  right: 10px;
+  bottom: 50%;
+  background: #1a1a2e;
+  color: #0f0;
+  border: 1px solid #333;
+  border-radius: 10px;
+  padding: 16px;
+  font-family: 'SF Mono', 'Menlo', 'Courier New', monospace;
+  font-size: 16px;
+  line-height: 1.6;
+  resize: none;
+  outline: none;
+  z-index: 5;
+}
+
+#text-output.hidden {
+  display: none !important;
+}
+
+#text-output::placeholder {
+  color: #555;
+}
+
+/* ── Floating controls ── */
+#float-controls {
+  position: fixed;
+  bottom: 10px;
+  right: 10px;
+  z-index: 1001;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  background: rgba(25, 25, 25, 0.9);
+  border: 1px solid #555;
+  border-radius: 22px;
+  padding: 3px 6px;
+}
+
+#float-controls button {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: rgba(60, 60, 60, 0.9);
+  border: 1px solid #666;
+  color: #eee;
+  font-size: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+#float-controls button:active {
+  background: rgba(100, 100, 100, 0.9);
+}
+
+#kb-toggle.active {
+  background: rgba(37, 99, 235, 0.9);
+  border-color: #5af;
+}
+
+#zoom-label {
+  color: #aaa;
+  font-size: 11px;
+  min-width: 36px;
+  text-align: center;
+}
+
+/* ── Opacity control ── */
+#opacity-control {
+  position: fixed;
+  bottom: 56px;
+  right: 10px;
+  z-index: 1002;
+  background: rgba(30, 30, 30, 0.95);
+  border: 1px solid #444;
+  border-radius: 8px;
+  padding: 8px 12px;
+  font-size: 12px;
+  color: #ccc;
+}
+
+#opacity-slider {
+  width: 120px;
+  vertical-align: middle;
+}
+
+/* ── Key event indicator ── */
+#key-indicator {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: rgba(0,0,0,0.7);
+  color: #fff;
+  padding: 8px 18px;
+  border-radius: 8px;
+  font-size: 18px;
+  font-weight: 600;
+  z-index: 1100;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+
+#key-indicator.show {
+  opacity: 1;
+}
+
+/* ── Keyboard overlay ── */
+#keyboard {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 1000;
+  background: rgba(30, 30, 30, 0.85);
+  border-top: 1px solid #444;
+  padding: 2px 2px env(safe-area-inset-bottom, 2px) 2px;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  transition: transform 0.2s ease, opacity 0.2s ease;
+}
+
+#kb-toolbar {
+  display: flex;
+  justify-content: flex-end;
+  gap: 4px;
+  padding: 2px 4px;
+}
+
+#kb-toolbar button {
+  background: #3a3a3a;
+  border: 1px solid #555;
+  border-radius: 4px;
+  color: #ccc;
+  font-size: 11px;
+  padding: 2px 8px;
+  cursor: pointer;
+}
+
+#kb-toolbar button:active {
+  background: #555;
+}
+
+#kb-toolbar button.active {
+  background: #2563eb;
+  color: #fff;
+  border-color: #5af;
+}
+
+/* ── Keyboard rows ── */
+#kb-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.kb-row {
+  display: flex;
+  gap: 2px;
+  justify-content: center;
+}
+
+.kb-row.fn-row {
+  display: none;
+}
+
+.kb-row.fn-row.visible {
+  display: flex;
+}
+
+/* ── Key buttons ── */
+.kb-key {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 36px;
+  min-width: 28px;
+  padding: 0 4px;
+  background: #4a4a4a;
+  border: 1px solid #666;
+  border-radius: 5px;
+  color: #eee;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  flex-shrink: 0;
+  position: relative;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  transition: background 0.08s;
+}
+
+.kb-key:active,
+.kb-key.pressed {
+  background: #6a9fff;
+  border-color: #88b4ff;
+  color: #fff;
+}
+
+.kb-key.modifier {
+  background: #3a3a3a;
+}
+
+.kb-key.modifier.active {
+  background: #d97706;
+  border-color: #f59e0b;
+  color: #fff;
+}
+
+.kb-key.space {
+  flex: 1;
+  max-width: 50%;
+}
+
+/* ── Width classes ── */
+.kb-key.w-1-2 { min-width: calc(28px * 1.2); }
+.kb-key.w-1-5 { min-width: calc(28px * 1.5); }
+.kb-key.w-1-8 { min-width: calc(28px * 1.8); }
+.kb-key.w-2   { min-width: calc(28px * 2.0); }
+.kb-key.w-2-2 { min-width: calc(28px * 2.2); }
+.kb-key.w-2-5 { min-width: calc(28px * 2.5); }
+
+/* ── Hidden utility ── */
+.hidden {
+  display: none !important;
+}
+
+/* ── Landscape adjustments ── */
+@media (orientation: landscape) {
+  .kb-key {
+    height: 30px;
+    font-size: 11px;
+    min-width: 24px;
+  }
+  .kb-key.w-1-2 { min-width: calc(24px * 1.2); }
+  .kb-key.w-1-5 { min-width: calc(24px * 1.5); }
+  .kb-key.w-1-8 { min-width: calc(24px * 1.8); }
+  .kb-key.w-2   { min-width: calc(24px * 2.0); }
+  .kb-key.w-2-2 { min-width: calc(24px * 2.2); }
+  .kb-key.w-2-5 { min-width: calc(24px * 2.5); }
+  #keyboard {
+    padding: 1px 2px env(safe-area-inset-bottom, 1px) 2px;
+  }
+  #kb-rows {
+    gap: 1px;
+  }
+  .kb-row {
+    gap: 1px;
+  }
+}
+
+/* Small screens */
+@media (max-width: 480px) {
+  .kb-key {
+    font-size: 10px;
+    min-width: 22px;
+    height: 32px;
+    padding: 0 2px;
+  }
+}
