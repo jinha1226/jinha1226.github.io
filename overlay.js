@@ -845,6 +845,8 @@
       sendToCrawl(k);
       showStatus((sendMode === 'ws' ? 'WS' : 'DOM') + ': ' + ek,
                   sendMode === 'ws' ? '#0f0' : '#f90');
+      // Auto-release shift after use
+      if (shift) { shift = false; updateMods(); updateLabels(); }
     } catch(e) {
       showStatus('ERR: ' + e.message, '#f00');
     }
