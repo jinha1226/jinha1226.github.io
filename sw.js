@@ -1,9 +1,8 @@
-const CACHE_NAME = 'screenpad-v5';
+const CACHE_NAME = 'screenpad-v6';
 const ASSETS = [
   './',
   './index.html',
-  './style.css',
-  './app.js',
+  './overlay.js',
   './manifest.json',
   './icon-192.png',
   './icon-512.png',
