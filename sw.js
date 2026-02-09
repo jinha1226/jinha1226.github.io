@@ -1,4 +1,4 @@
-const CACHE_NAME = 'screenpad-v3';
+const CACHE_NAME = 'screenpad-v4';
 const ASSETS = [
   './',
   './index.html',

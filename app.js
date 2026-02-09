@@ -454,7 +454,7 @@ function applyOpacity() {
 }
 
 // ── URL Bar ──
-function loadURL(url) {
+async function loadURL(url) {
   if (!url) return;
   if (!/^https?:\/\//i.test(url)) {
     url = 'https://' + url;
@@ -468,13 +468,47 @@ function loadURL(url) {
   const output = document.getElementById('text-output');
   if (output) output.classList.add('hidden');
 
-  // Load directly in iframe (no proxy server needed)
-  gameFrame.src = url;
+  // Try same-origin proxy load so keyboard events can reach the iframe
+  const proxied = await tryProxyLoad(url);
+  if (!proxied) {
+    // Fallback: direct load (keyboard won't work for cross-origin pages)
+    gameFrame.src = url;
+  }
+
   gameFrame.onload = () => {
-    gameFrame.contentWindow.focus();
+    try { gameFrame.contentWindow.focus(); } catch (_) {}
   };
 
   requestAnimationFrame(updateLayout);
+}
+
+async function tryProxyLoad(targetUrl) {
+  try {
+    const proxyUrl = 'https://api.allorigins.win/raw?url=' + encodeURIComponent(targetUrl);
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 10000);
+
+    const resp = await fetch(proxyUrl, { signal: controller.signal });
+    clearTimeout(timer);
+    if (!resp.ok) return false;
+
+    let html = await resp.text();
+
+    // Inject <base> tag so relative resources resolve to original domain
+    const baseHref = targetUrl.replace(/[^/]*(\?.*)?$/, '');
+    const baseTag = '<base href="' + baseHref + '">';
+    if (/<head[^>]*>/i.test(html)) {
+      html = html.replace(/(<head[^>]*>)/i, '$1\n' + baseTag);
+    } else {
+      html = '<head>' + baseTag + '</head>\n' + html;
+    }
+
+    const blob = new Blob([html], { type: 'text/html' });
+    gameFrame.src = URL.createObjectURL(blob);
+    return true;
+  } catch (_) {
+    return false;
+  }
 }
 
 function appendToTextOutput(output, eventInit) {
