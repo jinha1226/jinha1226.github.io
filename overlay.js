@@ -247,15 +247,16 @@
   // ── CSS ──
   var css = document.createElement('style');
   css.textContent = '#sp-overlay{position:fixed;z-index:999999;'
-    +'background:rgba(20,20,20,.65);border-radius:12px;padding:4px 3px;'
-    +'backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);font-family:system-ui,sans-serif;'
+    +'background:rgba(10,10,10,.35);border-radius:12px;padding:4px 3px;'
+    +'backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);font-family:system-ui,sans-serif;'
     +'touch-action:manipulation;-webkit-user-select:none;user-select:none;}'
     +'#sp-rows{display:flex;flex-direction:column;gap:3px;}'
     +'.sp-row{display:flex;gap:3px;justify-content:center;padding:0 2px;}'
-    +'.sp-k{display:inline-flex;align-items:center;justify-content:center;height:64px;min-width:0;'
-    +'flex:1;padding:0 2px;background:rgba(74,74,74,.8);border:1px solid rgba(102,102,102,.7);border-radius:6px;color:#eee;'
-    +'font-size:21px;font-weight:500;cursor:pointer;touch-action:manipulation;'
-    +'-webkit-tap-highlight-color:transparent;transition:background .08s;}'
+    +'.sp-k{display:inline-flex;flex-direction:column;align-items:center;justify-content:center;height:72px;min-width:0;'
+    +'flex:1;padding:0 2px;background:rgba(60,60,60,.45);border:1px solid rgba(120,120,120,.4);border-radius:6px;color:#eee;'
+    +'font-size:24px;font-weight:500;cursor:pointer;touch-action:manipulation;'
+    +'-webkit-tap-highlight-color:transparent;transition:background .08s;line-height:1;}'
+    +'.sp-k .vi-arrow{font-size:11px;opacity:.6;line-height:1;margin-top:1px;}'
     +'.sp-k:active,.sp-k.pressed{background:#6a9fff;border-color:#88b4ff;color:#fff;}'
     +'.sp-k.mod{background:#3a3a3a;}'
     +'.sp-k.mod.active{background:#d97706;border-color:#f59e0b;color:#fff;}'
@@ -315,8 +316,9 @@
     +'color:#0f0;padding:4px 8px;border-radius:4px;font-size:11px;font-family:monospace;'
     +'pointer-events:none;opacity:0;transition:opacity .3s;}'
     +'#sp-status.show{opacity:1;}'
-    +'@media(orientation:landscape){.sp-k{height:52px;font-size:17px;}'
+    +'@media(orientation:landscape){.sp-k{height:56px;font-size:19px;}'
     +'#sp-overlay{padding:2px 3px;}'
+    +'.sp-k .vi-arrow{font-size:9px;}'
     +'.sp-dp{width:56px;height:56px;}'
     +'.sp-dp .arrow{font-size:20px;}'
     +'.sp-dp .letter{font-size:10px;}'
@@ -717,7 +719,33 @@
   }
   makeDraggable(dragHandle, dpadPanel);
   makeDraggable(actDragHandle, actPanel);
-  makeDraggable(kbDragHandle, kb);
+
+  // Keyboard: vertical-only drag (horizontal stays fixed full-width)
+  (function() {
+    var ds = { active: false, startY: 0, origY: 0 };
+    kbDragHandle.addEventListener('touchstart', function(e) {
+      e.preventDefault();
+      var t = e.changedTouches[0];
+      ds.active = true; ds.startY = t.clientY; ds.origY = kb.getBoundingClientRect().top;
+    }, { passive: false });
+    kbDragHandle.addEventListener('mousedown', function(e) {
+      e.preventDefault();
+      ds.active = true; ds.startY = e.clientY; ds.origY = kb.getBoundingClientRect().top;
+    });
+    document.addEventListener('touchmove', function(e) {
+      if (!ds.active) return;
+      var t = e.changedTouches[0];
+      kb.style.top = (ds.origY + t.clientY - ds.startY) + 'px';
+      kb.style.bottom = 'auto';
+    }, { passive: true });
+    document.addEventListener('mousemove', function(e) {
+      if (!ds.active) return;
+      kb.style.top = (ds.origY + e.clientY - ds.startY) + 'px';
+      kb.style.bottom = 'auto';
+    });
+    document.addEventListener('touchend', function() { ds.active = false; });
+    document.addEventListener('mouseup', function() { ds.active = false; });
+  })();
 
   // ── Helper functions for full keyboard ──
   function effectiveKey(k) {
@@ -729,6 +757,9 @@
     if ((shift || caps) && base >= 'a' && base <= 'z') return base.toUpperCase();
     return base;
   }
+
+  // vi-key arrow map for full keyboard
+  var VI_ARROWS = {y:'\u2196',k:'\u2191',u:'\u2197',h:'\u2190',l:'\u2192',b:'\u2199',j:'\u2193',n:'\u2198'};
 
   function buildKeys() {
     rows.innerHTML = '';
@@ -750,7 +781,13 @@
         var label = k.label || k.key;
         if (k.key.length === 1 && k.key >= 'a' && k.key <= 'z' && (shift || caps))
           label = label.toUpperCase();
-        btn.textContent = label;
+        var arrow = VI_ARROWS[k.key];
+        if (arrow && !k.mod) {
+          btn.innerHTML = '<span>' + label + '</span><span class="vi-arrow">' + arrow + '</span>';
+          btn.dataset.vi = '1';
+        } else {
+          btn.textContent = label;
+        }
         row.appendChild(btn);
       });
       rows.appendChild(row);
@@ -763,10 +800,20 @@
     rows.querySelectorAll('.sp-k').forEach(function(btn) {
       try {
         var k = JSON.parse(btn.dataset.idx);
-        if (k.s && shift) btn.textContent = k.s;
+        var label;
+        if (k.s && shift) label = k.s;
         else if (k.key.length === 1 && k.key >= 'a' && k.key <= 'z')
-          btn.textContent = (shift || caps) ? k.key.toUpperCase() : k.key;
-        else if (k.s && !shift) btn.textContent = k.label || k.key;
+          label = (shift || caps) ? k.key.toUpperCase() : k.key;
+        else if (k.s && !shift) label = k.label || k.key;
+        else label = null;
+        if (label !== null) {
+          var arrow = VI_ARROWS[k.key];
+          if (arrow && btn.dataset.vi) {
+            btn.innerHTML = '<span>' + label + '</span><span class="vi-arrow">' + arrow + '</span>';
+          } else {
+            btn.textContent = label;
+          }
+        }
       } catch(e) {}
     });
   }
