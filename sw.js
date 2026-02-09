@@ -1,4 +1,4 @@
-const CACHE_NAME = 'screenpad-v4';
+const CACHE_NAME = 'screenpad-v5';
 const ASSETS = [
   './',
   './index.html',
@@ -28,17 +28,15 @@ self.addEventListener('fetch', (event) => {
   const url = new URL(event.request.url);
   // Only cache same-origin static assets
   if (url.origin === self.location.origin) {
+    // Network-first: always try fresh content, fall back to cache offline
     event.respondWith(
-      caches.match(event.request).then((cached) => {
-        const fetched = fetch(event.request).then((response) => {
-          if (response && response.status === 200) {
-            const clone = response.clone();
-            caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));
-          }
-          return response;
-        }).catch(() => cached);
-        return cached || fetched;
-      })
+      fetch(event.request).then((response) => {
+        if (response && response.status === 200) {
+          const clone = response.clone();
+          caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));
+        }
+        return response;
+      }).catch(() => caches.match(event.request))
     );
   }
 });

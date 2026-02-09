@@ -231,11 +231,20 @@ function sendKey(type, keyDef) {
         if (activeEl && !targets.includes(activeEl)) {
           targets.push(activeEl);
         }
+        // Also target canvas elements (most games use canvas)
+        doc.querySelectorAll('canvas').forEach((c) => {
+          if (!targets.includes(c)) targets.push(c);
+        });
         targets.forEach((t) => {
           if (t) {
             try { t.dispatchEvent(new KeyboardEvent(type, eventInit)); } catch (_) {}
           }
         });
+        // Focus canvas if present (games need focus to receive events)
+        const canvas = doc.querySelector('canvas');
+        if (canvas && type === 'keydown') {
+          try { canvas.setAttribute('tabindex', '0'); canvas.focus(); } catch (_) {}
+        }
       }
     }
   } catch (_) {
@@ -482,33 +491,42 @@ async function loadURL(url) {
   requestAnimationFrame(updateLayout);
 }
 
+const CORS_PROXIES = [
+  (url) => 'https://api.allorigins.win/raw?url=' + encodeURIComponent(url),
+  (url) => 'https://api.codetabs.com/v1/proxy?quest=' + encodeURIComponent(url),
+];
+
 async function tryProxyLoad(targetUrl) {
-  try {
-    const proxyUrl = 'https://api.allorigins.win/raw?url=' + encodeURIComponent(targetUrl);
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 10000);
+  for (const makeProxy of CORS_PROXIES) {
+    try {
+      const proxyUrl = makeProxy(targetUrl);
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 8000);
 
-    const resp = await fetch(proxyUrl, { signal: controller.signal });
-    clearTimeout(timer);
-    if (!resp.ok) return false;
+      const resp = await fetch(proxyUrl, { signal: controller.signal });
+      clearTimeout(timer);
+      if (!resp.ok) continue;
 
-    let html = await resp.text();
+      let html = await resp.text();
+      if (!html || html.length < 50) continue;
 
-    // Inject <base> tag so relative resources resolve to original domain
-    const baseHref = targetUrl.replace(/[^/]*(\?.*)?$/, '');
-    const baseTag = '<base href="' + baseHref + '">';
-    if (/<head[^>]*>/i.test(html)) {
-      html = html.replace(/(<head[^>]*>)/i, '$1\n' + baseTag);
-    } else {
-      html = '<head>' + baseTag + '</head>\n' + html;
+      // Inject <base> tag so relative resources resolve to original domain
+      const baseHref = targetUrl.replace(/[^/]*(\?.*)?$/, '');
+      const baseTag = '<base href="' + baseHref + '">';
+      if (/<head[^>]*>/i.test(html)) {
+        html = html.replace(/(<head[^>]*>)/i, '$1\n' + baseTag);
+      } else {
+        html = '<head>' + baseTag + '</head>\n' + html;
+      }
+
+      const blob = new Blob([html], { type: 'text/html' });
+      gameFrame.src = URL.createObjectURL(blob);
+      return true;
+    } catch (_) {
+      continue;
     }
-
-    const blob = new Blob([html], { type: 'text/html' });
-    gameFrame.src = URL.createObjectURL(blob);
-    return true;
-  } catch (_) {
-    return false;
   }
+  return false;
 }
 
 function appendToTextOutput(output, eventInit) {
@@ -661,9 +679,11 @@ function init() {
   // Initial layout
   requestAnimationFrame(updateLayout);
 
-  // Register service worker for PWA / offline support
+  // Register service worker for PWA / offline support (force update check)
   if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('./sw.js');
+    navigator.serviceWorker.register('./sw.js', { updateViaCache: 'none' }).then((reg) => {
+      reg.update();
+    });
   }
 
   // Debug logging (localhost only)
