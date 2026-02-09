@@ -105,13 +105,14 @@
     }
   }
 
-  // Send a simple character (for D-pad/action buttons)
+  // Send a single character as keycode (for D-pad/action buttons)
+  // IMPORTANT: use msg:"key" not msg:"input" — "input" buffers text and causes
+  // DCSS to run-until-blocked (e.g. move to wall). "key" sends a single keypress.
   function sendChar(ch) {
     if (useWS()) {
-      wsSend('{"msg":"input","text":' + JSON.stringify(ch) + '}');
+      wsSend('{"msg":"key","keycode":' + ch.charCodeAt(0) + '}');
       showStatus('WS: ' + ch, '#0f0');
     } else {
-      // DOM mode: build a fake keyDef for the character
       var fakeKey = { key: ch, code: '', kc: ch.charCodeAt(0) };
       dispatchDOMEvents('keydown', fakeKey);
       dispatchDOMEvents('keypress', fakeKey);
@@ -226,11 +227,13 @@
     [ {label:'b',char:'b',desc:'↙'}, {label:'j',char:'j',desc:'↓'}, {label:'n',char:'n',desc:'↘'} ],
   ];
 
-  // ── Action Buttons (DCSS essential commands) ──
+  // ── Action Buttons (DCSS essential commands) — 5 columns ──
   var ACTIONS = [
-    [ {label:'Tab',keycode:9,desc:'Auto-fight'}, {label:'o',char:'o',desc:'Auto-explore'}, {label:'>',char:'>',desc:'Descend'}, {label:'<',char:'<',desc:'Ascend'} ],
-    [ {label:'i',char:'i',desc:'Inventory'}, {label:'g',char:'g',desc:'Pick up'}, {label:'5',char:'5',desc:'Rest'}, {label:'Esc',keycode:27,desc:'Cancel'} ],
-    [ {label:'Ctrl',mod:'ctrl',desc:'Modifier'}, {label:'Shift',mod:'shift',desc:'Modifier'}, {label:'@',char:'@',desc:'Status'}, {label:'\\',char:'\\',desc:'Known'} ],
+    [ {label:'Tab',keycode:9,desc:'Auto-fight'}, {label:'o',char:'o',desc:'Auto-explore'}, {label:'5',char:'5',desc:'Rest'}, {label:'>',char:'>',desc:'Descend'}, {label:'<',char:'<',desc:'Ascend'} ],
+    [ {label:'i',char:'i',desc:'Inventory'}, {label:'g',char:'g',desc:'Pick up'}, {label:'d',char:'d',desc:'Drop'}, {label:'e',char:'e',desc:'Eat/Quaff'}, {label:'f',char:'f',desc:'Fire'} ],
+    [ {label:'p',char:'p',desc:'Pray/Prev'}, {label:'z',char:'z',desc:'Zap'}, {label:'a',char:'a',desc:'Ability'}, {label:'x',char:'x',desc:'Examine'}, {label:'X',char:'X',desc:'Explore map'} ],
+    [ {label:'Space',keycode:32,desc:'Space'}, {label:'Enter',keycode:13,desc:'Enter'}, {label:'Esc',keycode:27,desc:'Cancel'}, {label:'Ctrl',mod:'ctrl',desc:'Modifier'}, {label:'Shift',mod:'shift',desc:'Modifier'} ],
+    [ {label:'@',char:'@',desc:'Status'}, {label:'\\',char:'\\',desc:'Known'}, {label:'%',char:'%',desc:'Skills'}, {label:'^',char:'^',desc:'Religion'}, {label:'?',char:'?',desc:'Help'} ],
   ];
 
   var shift=false, ctrl=false, alt=false, caps=false;
@@ -275,31 +278,31 @@
     +'background:rgba(60,60,60,.9);border:1px solid #666;}'
     +'#sp-zoom-label{color:#ccc;font-size:12px;font-family:monospace;background:rgba(0,0,0,.5);'
     +'padding:2px 6px;border-radius:4px;pointer-events:none;}'
-    // D-Pad panel
-    +'#sp-dpad-panel{position:fixed;z-index:999997;touch-action:manipulation;'
-    +'-webkit-user-select:none;user-select:none;}'
-    +'#sp-dpad-wrap{display:flex;gap:8px;align-items:flex-start;}'
-    // D-Pad grid
-    +'#sp-dpad{display:grid;grid-template-columns:repeat(3,1fr);gap:3px;}'
-    +'.sp-dp{display:flex;align-items:center;justify-content:center;width:52px;height:52px;'
-    +'background:rgba(70,70,70,.6);border:1px solid rgba(150,150,150,.4);border-radius:10px;'
-    +'color:#eee;font-size:18px;font-weight:600;cursor:pointer;touch-action:manipulation;'
+    // Floating panels (shared)
+    +'.sp-float-panel{position:fixed;z-index:2147483646;touch-action:manipulation;'
+    +'-webkit-user-select:none;user-select:none;background:rgba(20,20,20,.75);'
+    +'border-radius:12px;padding:4px;backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);}'
+    // D-Pad grid — 3x3, big buttons
+    +'#sp-dpad{display:grid;grid-template-columns:repeat(3,1fr);gap:4px;}'
+    +'.sp-dp{display:flex;align-items:center;justify-content:center;width:68px;height:68px;'
+    +'background:rgba(70,70,70,.7);border:1px solid rgba(150,150,150,.5);border-radius:12px;'
+    +'color:#eee;font-size:22px;font-weight:700;cursor:pointer;touch-action:manipulation;'
     +'-webkit-tap-highlight-color:transparent;transition:background .08s;}'
-    +'.sp-dp:active,.sp-dp.pressed{background:rgba(106,159,255,.7);border-color:#88b4ff;}'
-    +'.sp-dp.center{background:rgba(50,50,50,.6);font-size:22px;}'
-    // Action grid
-    +'#sp-actions{display:grid;grid-template-columns:repeat(4,1fr);gap:3px;}'
-    +'.sp-act{display:flex;align-items:center;justify-content:center;width:52px;height:52px;'
-    +'background:rgba(50,80,50,.6);border:1px solid rgba(100,180,100,.4);border-radius:10px;'
-    +'color:#eee;font-size:13px;font-weight:600;cursor:pointer;touch-action:manipulation;'
+    +'.sp-dp:active,.sp-dp.pressed{background:rgba(106,159,255,.8);border-color:#88b4ff;}'
+    +'.sp-dp.center{background:rgba(80,80,50,.7);font-size:26px;}'
+    // Action grid — 5 columns, big buttons
+    +'#sp-actions{display:grid;grid-template-columns:repeat(5,1fr);gap:4px;}'
+    +'.sp-act{display:flex;align-items:center;justify-content:center;width:60px;height:54px;'
+    +'background:rgba(50,80,50,.7);border:1px solid rgba(100,180,100,.5);border-radius:10px;'
+    +'color:#eee;font-size:14px;font-weight:600;cursor:pointer;touch-action:manipulation;'
     +'-webkit-tap-highlight-color:transparent;transition:background .08s;}'
-    +'.sp-act:active,.sp-act.pressed{background:rgba(100,200,100,.7);border-color:#8f8;}'
-    +'.sp-act.mod-btn{background:rgba(60,50,20,.6);border-color:rgba(180,150,50,.4);}'
-    +'.sp-act.mod-btn.active{background:rgba(217,119,6,.7);border-color:#f59e0b;}'
+    +'.sp-act:active,.sp-act.pressed{background:rgba(100,200,100,.8);border-color:#8f8;}'
+    +'.sp-act.mod-btn{background:rgba(60,50,20,.7);border-color:rgba(180,150,50,.5);}'
+    +'.sp-act.mod-btn.active{background:rgba(217,119,6,.8);border-color:#f59e0b;}'
     // Drag handle
-    +'.sp-drag-handle{width:100%;height:16px;background:rgba(255,255,255,.1);border-radius:8px 8px 0 0;'
+    +'.sp-drag-handle{width:100%;height:20px;background:rgba(255,255,255,.12);border-radius:10px 10px 0 0;'
     +'cursor:grab;display:flex;align-items:center;justify-content:center;margin-bottom:4px;}'
-    +'.sp-drag-handle::after{content:"";width:30px;height:3px;background:rgba(255,255,255,.3);'
+    +'.sp-drag-handle::after{content:"";width:36px;height:4px;background:rgba(255,255,255,.35);'
     +'border-radius:2px;}'
     // Existing indicators
     +'#sp-indicator{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);'
@@ -312,8 +315,8 @@
     +'#sp-status.show{opacity:1;}'
     +'@media(orientation:landscape){.sp-k{height:38px;font-size:13px;}'
     +'#sp-overlay{padding:2px 3px env(safe-area-inset-bottom,2px);}'
-    +'.sp-dp{width:44px;height:44px;font-size:15px;}'
-    +'.sp-act{width:44px;height:44px;font-size:11px;}}';
+    +'.sp-dp{width:56px;height:56px;font-size:18px;}'
+    +'.sp-act{width:50px;height:44px;font-size:12px;}}';
   document.head.appendChild(css);
 
   // ── Status indicator ──
@@ -454,6 +457,7 @@
     indicator.style.transform = 'scale(' + invScale + ')';
     if (dpadPanel.style.display !== 'none') {
       dpadPanel.style.transform = 'scale(' + invScale + ')';
+      actPanel.style.transform = 'scale(' + invScale + ')';
     }
     if (kb.style.display !== 'none') {
       kb.style.transform = 'scale(' + invScale + ')';
@@ -488,6 +492,7 @@
     status.style.transform = '';
     indicator.style.transform = '';
     dpadPanel.style.transform = '';
+    actPanel.style.transform = '';
     kb.style.transform = '';
     showStatus('Zoom: Reset', '#5af');
   });
@@ -501,22 +506,18 @@
   kb.appendChild(rows);
   document.body.appendChild(kb);
 
-  // ── D-Pad + Actions Panel ──
+  // ── D-Pad Panel (separate floating) ──
   var dpadPanel = document.createElement('div');
+  dpadPanel.className = 'sp-float-panel';
   dpadPanel.id = 'sp-dpad-panel';
   dpadPanel.style.display = 'none';
   dpadPanel.style.bottom = '70px';
   dpadPanel.style.left = '10px';
 
-  // Drag handle
   var dragHandle = document.createElement('div');
   dragHandle.className = 'sp-drag-handle';
   dpadPanel.appendChild(dragHandle);
 
-  var dpadWrap = document.createElement('div');
-  dpadWrap.id = 'sp-dpad-wrap';
-
-  // Build D-Pad
   var dpadGrid = document.createElement('div');
   dpadGrid.id = 'sp-dpad';
   DPAD.forEach(function(row, ri) {
@@ -530,9 +531,21 @@
       dpadGrid.appendChild(btn);
     });
   });
-  dpadWrap.appendChild(dpadGrid);
+  dpadPanel.appendChild(dpadGrid);
+  document.body.appendChild(dpadPanel);
 
-  // Build Action buttons
+  // ── Action Panel (separate floating) ──
+  var actPanel = document.createElement('div');
+  actPanel.className = 'sp-float-panel';
+  actPanel.id = 'sp-act-panel';
+  actPanel.style.display = 'none';
+  actPanel.style.bottom = '70px';
+  actPanel.style.right = '10px';
+
+  var actDragHandle = document.createElement('div');
+  actDragHandle.className = 'sp-drag-handle';
+  actPanel.appendChild(actDragHandle);
+
   var actGrid = document.createElement('div');
   actGrid.id = 'sp-actions';
   ACTIONS.forEach(function(row) {
@@ -550,18 +563,15 @@
       actGrid.appendChild(btn);
     });
   });
-  dpadWrap.appendChild(actGrid);
-  dpadPanel.appendChild(dpadWrap);
-  document.body.appendChild(dpadPanel);
+  actPanel.appendChild(actGrid);
+  document.body.appendChild(actPanel);
 
   // ── D-Pad / Action button press handler ──
   function pressDpadBtn(btn) {
     showIndicator(btn.textContent);
     if (btn.dataset.mod) {
-      // Toggle modifier state
       toggleMod(btn.dataset.mod);
-      // Update visual state on action mod buttons
-      dpadPanel.querySelectorAll('.sp-act.mod-btn').forEach(function(b) {
+      actPanel.querySelectorAll('.sp-act.mod-btn').forEach(function(b) {
         var m = b.dataset.mod;
         var a = false;
         if (m === 'ctrl') a = ctrl;
@@ -610,7 +620,7 @@
   function updateModButtons() {
     updateMods();
     updateLabels();
-    dpadPanel.querySelectorAll('.sp-act.mod-btn').forEach(function(b) {
+    actPanel.querySelectorAll('.sp-act.mod-btn').forEach(function(b) {
       var m = b.dataset.mod;
       var a = false;
       if (m === 'ctrl') a = ctrl;
@@ -619,112 +629,101 @@
     });
   }
 
-  // ── D-Pad Touch/Mouse Handlers ──
-  var dpadTouches = new Map();
-  var dpadMouseBtn = null;
+  // ── Shared touch/mouse handler for both panels ──
+  var padTouches = new Map();
+  var padMouseBtn = null;
 
-  dpadPanel.addEventListener('touchstart', function(e) {
-    var t0 = e.changedTouches[0];
-    var el = document.elementFromPoint(t0.clientX, t0.clientY);
-    // If touching drag handle, don't prevent default for drag
-    if (el && (el === dragHandle || el.closest('.sp-drag-handle'))) return;
-    e.preventDefault(); e.stopPropagation();
-    for (var i = 0; i < e.changedTouches.length; i++) {
-      var t = e.changedTouches[i];
-      el = document.elementFromPoint(t.clientX, t.clientY);
-      var btn = el && (el.closest('.sp-dp') || el.closest('.sp-act'));
-      if (!btn) continue;
+  function attachPanelEvents(panel) {
+    panel.addEventListener('touchstart', function(e) {
+      var t0 = e.changedTouches[0];
+      var el = document.elementFromPoint(t0.clientX, t0.clientY);
+      if (el && (el.classList.contains('sp-drag-handle') || el.closest('.sp-drag-handle'))) return;
+      e.preventDefault(); e.stopPropagation();
+      for (var i = 0; i < e.changedTouches.length; i++) {
+        var t = e.changedTouches[i];
+        el = document.elementFromPoint(t.clientX, t.clientY);
+        var btn = el && (el.closest('.sp-dp') || el.closest('.sp-act'));
+        if (!btn) continue;
+        btn.classList.add('pressed');
+        padTouches.set(t.identifier, btn);
+        pressDpadBtn(btn);
+      }
+    }, { passive: false, capture: true });
+
+    panel.addEventListener('touchend', function(e) {
+      e.preventDefault(); e.stopPropagation();
+      for (var i = 0; i < e.changedTouches.length; i++) {
+        var t = e.changedTouches[i];
+        var btn = padTouches.get(t.identifier);
+        if (btn) { btn.classList.remove('pressed'); padTouches.delete(t.identifier); }
+      }
+    }, { passive: false, capture: true });
+
+    panel.addEventListener('touchcancel', function(e) {
+      for (var i = 0; i < e.changedTouches.length; i++) {
+        var t = e.changedTouches[i];
+        var btn = padTouches.get(t.identifier);
+        if (btn) { btn.classList.remove('pressed'); padTouches.delete(t.identifier); }
+      }
+    }, { passive: false });
+
+    panel.addEventListener('mousedown', function(e) {
+      var btn = e.target.closest('.sp-dp') || e.target.closest('.sp-act');
+      if (!btn) return;
+      e.preventDefault(); e.stopPropagation();
       btn.classList.add('pressed');
-      dpadTouches.set(t.identifier, btn);
+      padMouseBtn = btn;
       pressDpadBtn(btn);
-    }
-  }, { passive: false, capture: true });
-
-  dpadPanel.addEventListener('touchend', function(e) {
-    e.preventDefault(); e.stopPropagation();
-    for (var i = 0; i < e.changedTouches.length; i++) {
-      var t = e.changedTouches[i];
-      var btn = dpadTouches.get(t.identifier);
-      if (btn) { btn.classList.remove('pressed'); dpadTouches.delete(t.identifier); }
-    }
-  }, { passive: false, capture: true });
-
-  dpadPanel.addEventListener('touchcancel', function(e) {
-    for (var i = 0; i < e.changedTouches.length; i++) {
-      var t = e.changedTouches[i];
-      var btn = dpadTouches.get(t.identifier);
-      if (btn) { btn.classList.remove('pressed'); dpadTouches.delete(t.identifier); }
-    }
-  }, { passive: false });
-
-  dpadPanel.addEventListener('mousedown', function(e) {
-    var btn = e.target.closest('.sp-dp') || e.target.closest('.sp-act');
-    if (!btn) return;
-    e.preventDefault(); e.stopPropagation();
-    btn.classList.add('pressed');
-    dpadMouseBtn = btn;
-    pressDpadBtn(btn);
-  });
-  document.addEventListener('mouseup', function() {
-    if (dpadMouseBtn) {
-      dpadMouseBtn.classList.remove('pressed');
-      dpadMouseBtn = null;
-    }
-  });
-
-  // ── D-Pad Drag to Reposition ──
-  var dragState = { active: false, startX: 0, startY: 0, origX: 0, origY: 0 };
-
-  dragHandle.addEventListener('touchstart', function(e) {
-    e.preventDefault();
-    var t = e.changedTouches[0];
-    var rect = dpadPanel.getBoundingClientRect();
-    dragState.active = true;
-    dragState.startX = t.clientX;
-    dragState.startY = t.clientY;
-    dragState.origX = rect.left;
-    dragState.origY = rect.top;
-  }, { passive: false });
-
-  document.addEventListener('touchmove', function(e) {
-    if (!dragState.active) return;
-    var t = e.changedTouches[0];
-    var dx = t.clientX - dragState.startX;
-    var dy = t.clientY - dragState.startY;
-    dpadPanel.style.left = (dragState.origX + dx) + 'px';
-    dpadPanel.style.top = (dragState.origY + dy) + 'px';
-    dpadPanel.style.bottom = 'auto';
-    dpadPanel.style.right = 'auto';
-  }, { passive: true });
-
-  document.addEventListener('touchend', function() {
-    dragState.active = false;
-  });
-
-  // Mouse drag
-  dragHandle.addEventListener('mousedown', function(e) {
-    e.preventDefault();
-    var rect = dpadPanel.getBoundingClientRect();
-    dragState.active = true;
-    dragState.startX = e.clientX;
-    dragState.startY = e.clientY;
-    dragState.origX = rect.left;
-    dragState.origY = rect.top;
-  });
-
-  document.addEventListener('mousemove', function(e) {
-    if (!dragState.active) return;
-    var dx = e.clientX - dragState.startX;
-    var dy = e.clientY - dragState.startY;
-    dpadPanel.style.left = (dragState.origX + dx) + 'px';
-    dpadPanel.style.top = (dragState.origY + dy) + 'px';
-    dpadPanel.style.bottom = 'auto';
-    dpadPanel.style.right = 'auto';
-  });
+    });
+  }
+  attachPanelEvents(dpadPanel);
+  attachPanelEvents(actPanel);
 
   document.addEventListener('mouseup', function() {
-    dragState.active = false;
+    if (padMouseBtn) { padMouseBtn.classList.remove('pressed'); padMouseBtn = null; }
   });
+
+  // ── Drag to Reposition (shared logic, independent states) ──
+  function makeDraggable(handle, panel) {
+    var ds = { active: false, startX: 0, startY: 0, origX: 0, origY: 0 };
+
+    handle.addEventListener('touchstart', function(e) {
+      e.preventDefault();
+      var t = e.changedTouches[0];
+      var rect = panel.getBoundingClientRect();
+      ds.active = true;
+      ds.startX = t.clientX; ds.startY = t.clientY;
+      ds.origX = rect.left; ds.origY = rect.top;
+    }, { passive: false });
+
+    handle.addEventListener('mousedown', function(e) {
+      e.preventDefault();
+      var rect = panel.getBoundingClientRect();
+      ds.active = true;
+      ds.startX = e.clientX; ds.startY = e.clientY;
+      ds.origX = rect.left; ds.origY = rect.top;
+    });
+
+    document.addEventListener('touchmove', function(e) {
+      if (!ds.active) return;
+      var t = e.changedTouches[0];
+      panel.style.left = (ds.origX + t.clientX - ds.startX) + 'px';
+      panel.style.top = (ds.origY + t.clientY - ds.startY) + 'px';
+      panel.style.bottom = 'auto'; panel.style.right = 'auto';
+    }, { passive: true });
+
+    document.addEventListener('mousemove', function(e) {
+      if (!ds.active) return;
+      panel.style.left = (ds.origX + e.clientX - ds.startX) + 'px';
+      panel.style.top = (ds.origY + e.clientY - ds.startY) + 'px';
+      panel.style.bottom = 'auto'; panel.style.right = 'auto';
+    });
+
+    document.addEventListener('touchend', function() { ds.active = false; });
+    document.addEventListener('mouseup', function() { ds.active = false; });
+  }
+  makeDraggable(dragHandle, dpadPanel);
+  makeDraggable(actDragHandle, actPanel);
 
   // ── Helper functions for full keyboard ──
   function effectiveKey(k) {
@@ -858,18 +857,21 @@
     mouseBtn = null;
   });
 
-  // ── Toggle: Gamepad (D-Pad + Actions) ──
+  // ── Toggle: Gamepad (D-Pad + Actions — two panels) ──
   var dpadVisible = false;
   gamepadToggle.addEventListener('click', function(e) {
     e.stopPropagation();
     dpadVisible = !dpadVisible;
     dpadPanel.style.display = dpadVisible ? '' : 'none';
+    actPanel.style.display = dpadVisible ? '' : 'none';
     if (dpadVisible) {
       gamepadToggle.setAttribute('style', BTN_ROUND + 'background:rgba(220,50,50,.9) !important;border-color:#f66 !important;');
       if (zoomLevel !== 100) {
         var invScale = 100 / zoomLevel;
         dpadPanel.style.transform = 'scale(' + invScale + ')';
         dpadPanel.style.transformOrigin = 'bottom left';
+        actPanel.style.transform = 'scale(' + invScale + ')';
+        actPanel.style.transformOrigin = 'bottom right';
       }
     } else {
       gamepadToggle.setAttribute('style', BTN_ROUND);
